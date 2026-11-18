@@ -252,7 +252,7 @@ h2{font-size:15px;margin:0}.panelhead small{display:block;color:var(--muted);fon
 </section>
 <section id="viewer-staff" hidden aria-label="Mis jornadas individuales">
   <div class="staff-title">
-    <div><div class="overline">ÁGORA · ACCESO INDIVIDUAL</div><h2>Mis jornadas</h2><p>Tu programación, registros y pagos en un solo lugar.</p></div>
+    <div><div class="overline">ÁGORA · ACCESO INDIVIDUAL</div><h2>Mis jornadas</h2><p>Tu programación, asistencia y horas trabajadas en un solo lugar.</p></div>
     <a class="editlink" href="./control-jornadas.html" hidden id="staff-admin-link">Control de coordinación</a>
   </div>
   <section id="login" hidden aria-hidden="true">
@@ -274,14 +274,14 @@ h2{font-size:15px;margin:0}.panelhead small{display:block;color:var(--muted);fon
       <button type="button" data-staff-tab="cronograma" aria-selected="false">Cronograma</button>
       <button type="button" data-staff-tab="asistencia" aria-selected="false">Asistencia</button>
       <button type="button" data-staff-tab="traslados" aria-selected="false">Traslados</button>
-      <button type="button" data-staff-tab="pagos" aria-selected="false">Comprobantes</button>
+      <button type="button" data-staff-tab="pagos" aria-selected="false">Validación de horas</button>
     </nav>
     <section class="staff-tab-panel" data-staff-panel="inicio" aria-label="Resumen de mi jornada">
       <div class="staff-dashboard">
         <section class="panel"><div class="staff-section-heading"><div><h3>Mi próxima jornada</h3><p>Consulta tu turno y accede al marcaje en un toque.</p></div></div><div id="j-today"></div></section>
         <section class="panel"><div class="staff-section-heading"><div><h3>Enseguida</h3><p>Actividades asignadas para los próximos días.</p></div><button type="button" class="staff-subtle" data-staff-tab="cronograma">Ver todo el cronograma</button></div><div id="j-upcoming"></div></section>
       </div>
-      <div class="staff-hint">Tus datos se actualizan desde Firebase. Solo tú y coordinación pueden consultar tus registros de asistencia y pagos.</div>
+      <div class="staff-hint">Tus datos se actualizan desde Firebase. Solo tú y coordinación pueden consultar tus registros de asistencia y jornada.</div>
     </section>
     <section class="staff-tab-panel" data-staff-panel="cronograma" hidden aria-label="Mi cronograma">
       <section class="panel">
@@ -321,16 +321,13 @@ h2{font-size:15px;margin:0}.panelhead small{display:block;color:var(--muted);fon
         <div id="j-trips"></div>
       </section>
     </section>
-    <section class="staff-tab-panel" data-staff-panel="pagos" hidden aria-label="Mis comprobantes">
+    <section class="staff-tab-panel" data-staff-panel="pagos" hidden aria-label="Confirmación de horas trabajadas">
       <section class="panel">
-        <div class="staff-section-heading"><div><h3>Mis comprobantes de trabajo</h3><p>Consulta tus horas, descansos declarados y tiempo extraordinario pendiente de revisión.</p></div></div>
-        <div class="staff-hint">Después de terminar tu actividad podrás crear el reporte de horas y descargar su PDF individual o mensual. Adjunta ese archivo manualmente a una solicitud en la herramienta independiente Solicitudes de Recursos y Pagos. Los estados de esta página son operativos y no autorizan ni registran transferencias bancarias. Las horas extra requieren revisión.</div>
+        <div class="staff-section-heading"><div><h3>Confirmar mis horas</h3><p>Revisa las jornadas terminadas, confirma el tiempo y envíalo para validación de coordinación.</p></div></div>
+        <div class="staff-hint">Cuando termines, confirma las horas registradas y tus descansos. Coordinación revisará y validará el resultado. No hay tarifas, números de cuenta, pagos ni archivos que descargar en Operaciones; la futura herramienta de Pagos consultará las jornadas validadas.</div>
         <div class="staff-pay-summary" id="j-pay-summary"></div>
-        <div class="staff-month-report">
-          <label for="j-month-report">Mes del resumen<input type="month" id="j-month-report"></label>
-          <button type="button" id="j-download-month-pdf">Descargar resumen PDF</button><button type="button" id="j-print-month">Vista imprimible</button>
-        </div>
-        <div class="staff-pay-toolbar"><label>Mostrar<select id="j-pay-filter"><option value="todos">Todos los registros</option><option value="pendientes">Por solicitar / corregir</option><option value="revision">En revisión</option><option value="pagados">Validados y pagados</option></select></label></div>
+        <div class="staff-month-report" hidden aria-hidden="true"><input type="month" id="j-month-report" aria-label="Periodo histórico"><button type="button" id="j-download-month-pdf" disabled>Archivo histórico</button><button type="button" id="j-print-month" disabled>Vista histórica</button></div>
+        <div class="staff-pay-toolbar"><label>Mostrar<select id="j-pay-filter"><option value="todos">Todos los registros</option><option value="pendientes">Por confirmar / corregir</option><option value="revision">En coordinación</option><option value="pagados">Validados / históricos</option></select></label></div>
         <div id="j-payment-list" class="staff-payment-list"></div>
       </section>
     </section>

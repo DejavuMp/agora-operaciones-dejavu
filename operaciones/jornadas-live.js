@@ -86,21 +86,9 @@ const statusOf=e=>{
 const eventSite=e=>(staff?.sites||[]).find(s=>s.id===e.siteId);
 const destination=e=>e?.venueAddress||eventSite(e)?.address||e?.venueName||eventSite(e)?.name||e?.location||"";
 const placeLabel=e=>e?.venueName||eventSite(e)?.name||e?.location||"Por confirmar";
-const currencyMXN=n=>new Intl.NumberFormat("es-MX",{style:"currency",currency:"MXN"}).format(n);
-function assignmentPaymentHtml(e){
-  const assignment=shiftOf(e,personId),amount=agreedAmount(assignment);
-  const rate=Number(assignment.rateAmount);
-  const agreed=amount===null?"Pendiente de acuerdo":currencyMXN(amount);
-  const per=assignment.rateUnit==="hora"?"por hora":"por jornada / servicio";
-  const rateLabel=assignment.rateUnit==="hora"&&Number.isFinite(rate)&&rate>0?
-    " · "+currencyMXN(rate)+"/h":"";
-  const extra=e?.overtimePolicy?.mode==="tarifa_hora"&&Number(e.overtimePolicy.hourlyRate)>0?
-    "Tarifa de referencia para horas extras del proyecto: "+currencyMXN(e.overtimePolicy.hourlyRate)+"/h, sujeta a validación.":
-    "Horas extras del proyecto: pendientes de revisión por coordinación.";
-  return '<div class="staff-payment-terms"><p><b>Asignado por:</b> '+esc(assignment.assignedByName||"Coordinación")+'</p>'+
-    '<p><b>Pago acordado:</b> '+esc(agreed)+' ('+esc(per)+')'+esc(rateLabel)+'</p>'+
-    '<p><b>Forma de pago:</b> '+esc(methodName(assignment.paymentMethod))+'</p>'+
-    '<p class="disclaimer">'+esc(extra)+' Este importe no acredita una transferencia ni un pago realizado.</p></div>';
+function assignmentDetailsHtml(e){
+  const name=shiftOf(e,personId).assignedByName||"Coordinación";
+  return '<p><b>Asignado por:</b> '+esc(name)+'</p>';
 }
 const tripLabel=e=>e?.vehicles?.length?
   e.vehicles.map(id=>(staff?.vehicles||[]).find(v=>v.id===id)?.name||"Unidad asignada").join(", "):"Sin camioneta asignada";
@@ -132,11 +120,11 @@ function chooseEvent(id,tab){
 function renderSummary(events){
   const ongoing=events.filter(e=>statusOf(e)[1]==="active"&&records.get(key(user.uid,e.id))?.status==="en_curso").length;
   const future=events.filter(e=>instant(eventEnd(e,personId))>=Date.now()).length;
-  const pendingPay=[...logs.values()].filter(l=>["capturado","revision","solicitado"].includes(l.paymentStatus)).length;
+  const pendingReview=[...logs.values()].filter(l=>["capturado","revision","solicitado"].includes(l.paymentStatus)).length;
   $("j-summary").innerHTML=
     '<div class="staff-metric"><span class="label">Por realizar</span><strong>'+future+'</strong><small>Jornadas asignadas</small></div>'+
     '<div class="staff-metric"><span class="label">En curso</span><strong>'+ongoing+'</strong><small>Registros activos</small></div>'+
-    '<div class="staff-metric"><span class="label">Pagos</span><strong>'+(logsLoaded?pendingPay:"—")+'</strong><small>Por solicitar o revisar</small></div>';
+    '<div class="staff-metric"><span class="label">Horas por validar</span><strong>'+(logsLoaded?pendingReview:"—")+'</strong><small>Confirmaciones pendientes</small></div>';
 }
 function renderHome(events){
   const upcoming=events.filter(e=>instant(eventEnd(e,personId))>=Date.now()-86400000);
@@ -152,7 +140,7 @@ function renderHome(events){
     '<p><b>'+esc(dateLabel(eventStart(featured,personId)))+'</b></p>'+
     '<p>'+eventDescription(featured)+'</p>'+
     '<p>Campaña: '+esc(featured.campaign||featured.project||"No especificada")+'</p>'+
-    '<p>Transporte: '+esc(tripLabel(featured))+'</p>'+assignmentPaymentHtml(featured)+
+    '<p>Transporte: '+esc(tripLabel(featured))+'</p>'+assignmentDetailsHtml(featured)+
     '<div class="staff-featured-actions"><button type="button" class="primary" data-open-event="'+esc(featured.id)+'" data-open-tab="asistencia">Marcar jornada</button>'+
     '<button type="button" data-open-event="'+esc(featured.id)+'" data-open-tab="traslados">Ver traslado</button></div></div>';
   const others=upcoming.filter(e=>e.id!==featured.id).slice(0,4);
@@ -244,7 +232,7 @@ function renderAttendance(){
   const existingActivity=$("start-activity")?.value||"";
   $("j-active").innerHTML='<div class="card"><b>'+esc(e.title||"Jornada")+'</b>'+
     '<p>Horario asignado: '+esc(when(eventStart(e,personId)))+' a '+esc(when(eventEnd(e,personId)))+'</p>'+
-    '<p>Sede: '+esc(placeLabel(e))+'</p>'+assignmentPaymentHtml(e)+
+    '<p>Sede: '+esc(placeLabel(e))+'</p>'+assignmentDetailsHtml(e)+
     (r?'<p><b>Entrada oficial:</b> '+esc(when(r.startedAt))+'<br>'+linkGeo(r.startGeo,"Ver punto de entrada")+'</p>':"")+
     (ended?'<p><b>Salida oficial:</b> '+esc(when(r.endedAt))+'<br>'+linkGeo(r.endGeo,"Ver punto de salida")+
       '</p><p>Actividad realizada: '+esc(r.endNote||"Sin descripción")+'</p>':"")+
@@ -293,65 +281,59 @@ function renderPayments(events){
     .sort((a,b)=>instant(b.start)-instant(a.start));
   const completed=events.filter(e=>records.get(key(user.uid,e.id))?.status==="finalizada");
   const unreported=completed.filter(e=>!own.some(l=>l.eventId===e.id));
-  const requests=own.filter(l=>["solicitado","revision"].includes(l.paymentStatus)).length;
-  const done=own.filter(l=>l.paymentStatus==="pagado").length;
+  const inReview=own.filter(l=>l.paymentStatus==="solicitado").length;
+  const validated=own.filter(l=>["validado","programado","pagado"].includes(l.paymentStatus)).length;
   $("j-pay-summary").innerHTML=
-    '<span>'+unreported.length+' jornada(s) sin reporte</span><span>'+requests+' solicitud(es) en revisión/corrección</span>'+
-    '<span>'+done+' pago(s) marcado(s) como realizados</span>';
+    '<span>'+unreported.length+' jornada(s) por confirmar</span>'+
+    '<span>'+inReview+' en revisión de coordinación</span>'+
+    '<span>'+validated+' con registro de cierre histórico/validado</span>';
   $("j-pay-filter").value=payFilter;
   if(!logsLoaded){
-    $("j-payment-list").innerHTML='<div class="staff-empty">Sincronizando tus registros de horas y pagos con Firebase…</div>';
+    $("j-payment-list").innerHTML='<div class="staff-empty">Sincronizando tus registros de asistencia con Firebase…</div>';
     return;
   }
-  const unreportedHtml=(payFilter==="todos"||payFilter==="pendientes")?
-    unreported.map(e=>{
-      const clock=records.get(key(user.uid,e.id));
-      const total=elapsedMinutes(clock?.startedAt,clock?.endedAt)/60;
-      const planned=timeStatement({clock,event:e,personId}).plannedMinutes;
-      const pauses=ownBreaks([...breaks.values()],user.uid,e.id);
-      const cert=breaksReady&&pauses.length?verifiedBreakSummary(clock,pauses):null;
-      return '<article class="staff-payment"><div class="pay-row"><div><h4>'+esc(e.title||"Actividad")+'</h4>'+
-        '<span class="staff-status-tag">Sin reporte de horas</span></div></div>'+
-        '<p>'+esc(dateLabel(eventStart(e,personId)))+' · '+esc(placeLabel(e))+'</p>'+
-        '<p>Entrada y salida confirmadas · '+esc(total.toFixed(2))+' h transcurridas · '+esc(hours(planned))+' programadas</p>'+
-        (cert?'<p class="staff-break-verified">Descansos con marcajes de Firebase: '+cert.minutes+' min · '+pauses.length+' pausas</p>':
-          '<label class="staff-break-declaration">Descanso realizado (minutos, declaración del integrante)<input type="number" data-break-for="'+esc(e.id)+'" min="0" max="'+Math.max(0,Math.floor(total*60))+'" step="1" value="0"></label>')+
-        '<div class="pay-row"><button type="button" class="primary" data-create-report="'+esc(e.id)+'" '+(busy?"disabled":"")+'>Crear comprobante de horas</button></div>'+
-        '<p>La entrada y salida provienen de Firebase. El descanso se declara aquí y queda sujeto a revisión. Las horas extras no se aprueban automáticamente.</p></article>';
-    }).join(""):"";
+  const showPending=payFilter==="todos"||payFilter==="pendientes";
+  const unreportedHtml=showPending?unreported.map(e=>{
+    const clock=records.get(key(user.uid,e.id));
+    const total=elapsedMinutes(clock?.startedAt,clock?.endedAt)/60;
+    const planned=timeStatement({clock,event:e,personId}).plannedMinutes;
+    const pauses=ownBreaks([...breaks.values()],user.uid,e.id);
+    const cert=breaksReady&&pauses.length?verifiedBreakSummary(clock,pauses):null;
+    return '<article class="staff-payment"><div class="pay-row"><h4>'+esc(e.title||"Actividad")+'</h4>'+
+      '<span class="staff-status-tag">Por confirmar</span></div>'+
+      '<p>'+esc(dateLabel(eventStart(e,personId)))+' · '+esc(placeLabel(e))+'</p>'+
+      '<p>Entrada y salida certificadas · '+esc(total.toFixed(2))+' h transcurridas · '+esc(hours(planned))+' programadas</p>'+
+      (cert?'<p>Descansos registrados: '+cert.minutes+' min · '+pauses.length+' pausa(s)</p>':
+        '<label class="staff-break-declaration">Minutos reales de descanso<input type="number" data-break-for="'+esc(e.id)+'" min="0" max="'+Math.max(0,Math.floor(total*60))+'" step="1" value="0"></label>')+
+      '<button type="button" class="primary" data-create-report="'+esc(e.id)+'" '+(busy?"disabled":"")+'>Revisar mis horas</button>'+
+      '<p>Confirma solamente tiempo trabajado, descansos y actividad. No se calcula ningún pago aquí.</p></article>';
+  }).join(""):"";
+  const names={capturado:"Pendiente de tu confirmación",solicitado:"En validación de coordinación",
+    revision:"Corrección solicitada",validado:"Horas validadas",
+    programado:"Registro histórico",pagado:"Registro histórico"};
   const existingHtml=own.filter(l=>paymentFilter(l.paymentStatus||"capturado",payFilter)).map(l=>{
-    const state=l.paymentStatus||"capturado";
-    const action=["capturado","revision"].includes(state);
-    const hasPriorApproved="approvedAmount" in l||"approvedHours" in l;
-    const canRequest=action&&events.some(e=>e.id===l.eventId)&&String(l.activity||"").trim().length>=4&&
-      !hasPriorApproved;
-    const approved=["validado","programado","pagado"].includes(state)&&
-      typeof l.approvedAmount==="number"&&Number.isFinite(l.approvedAmount);
+    const state=l.paymentStatus||"capturado",canSend=["capturado","revision"].includes(state);
     const e=events.find(x=>x.id===l.eventId);
     const clock=e?records.get(key(user.uid,e.id)):null;
-    const summary=(e&&clock?.status==="finalizada")?
+    const summary=e&&clock?.status==="finalizada"?
       timeStatement({clock,event:e,personId,breakMins:l.breakMins||0}):null;
-    const money=approved?" · Importe validado: "+new Intl.NumberFormat("es-MX",{style:"currency",currency:"MXN"}).format(l.approvedAmount):
-      " · Importe pendiente de validación";
-    const tagClass=state==="pagado"?"done":["solicitado","validado","programado"].includes(state)?"review":"";
-    return '<article class="staff-payment"><div class="pay-row"><div><h4>'+esc(events.find(e=>e.id===l.eventId)?.title||"Registro de jornada")+'</h4>'+
-      '<span class="staff-status-tag '+tagClass+'">'+esc(payLabel[state]||"Pendiente")+'</span></div></div>'+
-      '<p>'+esc(dateLabel(l.start))+' · '+esc(logHoursText(l))+' h netas'+esc(money)+'</p>'+
-      (summary?'<p><b>'+esc(summary.mode)+'</b> · Programadas '+esc(hours(summary.plannedMinutes))+
-        ' · Descanso '+esc(summary.breakMinutes)+' min · '+esc(overtimeText(summary))+'</p>':'')+
-      '<p>'+esc(l.activity||l.notes||"Actividad sin descripción")+'</p>'+
+    const hasPriorApproved=("approvedHours" in l)||("approvedAmount" in l);
+    return '<article class="staff-payment"><div class="pay-row"><h4>'+
+      esc(e?.title||"Jornada registrada")+'</h4><span class="staff-status-tag '+(state==="validado"?"done":"review")+'">'+
+      esc(names[state]||"Pendiente")+'</span></div>'+
+      '<p>'+esc(dateLabel(l.start))+' · '+esc(logHoursText(l))+' horas netas · '+esc(l.place||"Sede asignada")+'</p>'+
+      (summary?'<p>Horario programado: '+esc(hours(summary.plannedMinutes))+
+        ' · Descanso: '+esc(summary.breakMinutes)+' min · '+esc(overtimeText(summary))+'</p>':"")+
+      '<p><b>Actividad:</b> '+esc(l.activity||"Pendiente de descripción")+'</p>'+
       (l.returnNote?'<p><b>Comentario de coordinación:</b> '+esc(l.returnNote)+'</p>':"")+
-      (state==="pagado"?'<p>Coordinación registró el pago como realizado. Este estado no es un comprobante bancario.</p>':"")+
-      (summary?'<button type="button" data-download-report="'+esc(l.id)+'">Descargar PDF para pagos</button><button type="button" data-print-report="'+esc(l.id)+'">Vista imprimible</button>':'')+
-      (action?(hasPriorApproved?
-        '<p>Este registro contiene una validación anterior y requiere revisión de coordinación para reenviarse.</p>':
-        '<button type="button" class="primary" data-request-payment="'+esc(l.id)+'" '+(busy||!canRequest?"disabled":"")+'>Solicitar revisión de horas</button>'):"")+
+      (state==="validado"?'<p>Coordinación validó las horas. El registro queda listo para que la futura herramienta de Pagos lo consulte automáticamente, sin descargar archivos.</p>':"")+
+      (canSend?(hasPriorApproved?'<p>Este registro histórico requiere revisión de coordinación.</p>':
+        '<button type="button" class="primary" data-request-payment="'+esc(l.id)+'" '+(busy?"disabled":"")+
+        '>Confirmo mis horas y las envío a coordinación</button>'):"")+
       '</article>';
   }).join("");
   $("j-payment-list").innerHTML=unreportedHtml+existingHtml||
-    '<div class="staff-empty">'+(payFilter==="todos"?
-      "Aún no tienes reportes. Al terminar una jornada, podrás crear el reporte con tus horas oficiales y solicitar su revisión.":
-      "No hay registros en este filtro. Prueba «Todos los registros».")+'</div>';
+    '<div class="staff-empty">No hay jornadas para este filtro.</div>';
 }
 function render(){
   if(!staff||!user)return;
@@ -396,7 +378,7 @@ async function createReport(eventId,declaredBreakMins=0){
     status("Termina y confirma tu jornada antes de crear el reporte.","error");return;
   }
   if([...logs.values()].some(l=>l.ownerUid===user.uid&&l.eventId===eventId)){
-    status("Ya existe un reporte para esta jornada. Revísalo en Mis pagos.","error");return;
+    status("Ya existe un reporte para esta jornada. Revísalo en Validación de horas.","error");return;
   }
   const id="j_"+user.uid+"_"+eventId;
   await action(async()=>{
@@ -450,7 +432,7 @@ async function downloadWorkReceipt(id){
   try{
     status("Generando comprobante PDF local…");
     const filename=await downloadReceiptPdf(receiptData({log:record,event,clock,person:staff.person,personId}));
-    status("PDF descargado: "+filename+". Puedes adjuntarlo a la solicitud de recursos y pagos; no autoriza pagos.","ok");
+    status("El documento antiguo ya no forma parte del flujo de validación. Consulta el registro en ÁGORA.","ok");
   }catch(error){status("No se descargó el PDF: "+errorMessage(error)+". Usa la vista imprimible.","error")}
 }
 function printWorkReceipt(id){
@@ -475,7 +457,7 @@ async function requestPayment(id){
   const log=logs.get(id);
   if(!log||log.ownerUid!==user.uid||log.personId!==personId)return;
   if(!["capturado","revision"].includes(log.paymentStatus||"capturado")){
-    status("La solicitud ya está siendo revisada o fue validada.","error");return;
+    status("El reporte ya fue enviado a coordinación o validado.","error");return;
   }
   const activity=(staff?.events||[]).find(e=>e.id===log.eventId);
   if(!activity||!String(log.activity||"").trim()){
@@ -486,15 +468,15 @@ async function requestPayment(id){
   }
   const hours=netHours(log);
   if(!(hours>0)){status("El reporte todavía no tiene horas válidas.","error");return}
+  if(!confirm("¿Confirmas que revisaste tus horas y descansos y deseas enviarlos a coordinación?"))return;
   await action(async()=>{
     await updateDoc(doc(fs,"agora_ops_logs",id),{
       paymentStatus:"solicitado",
       requestedHours:Number(hours.toFixed(2)),
-      requestedRate:null,requestedAmount:null,
       revision:Number(log.revision||1)+1,updatedAt:serverTimestamp()
     });
     setTab("pagos");
-  },"Enviando tu reporte a revisión de pagos…");
+  },"Enviando las horas que confirmaste para validación de coordinación…");
 }
 function locSnapshot(){
   return new Promise((resolve,reject)=>{

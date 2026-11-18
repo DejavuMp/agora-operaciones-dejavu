@@ -6,9 +6,7 @@
  */
 import "../firebase-init.js";
 import {projectStaffView} from "./ops-safe-view.mjs";
-import {receiptData} from "./ops-receipt.mjs";
-import {overtimePolicy} from "./ops-paga.mjs";
-import {downloadReceiptPdf} from "./ops-pdf-download.mjs";
+import {verifiedAttendance} from "./ops-attendance-review.mjs";
 import {availablePeople,personForLink} from "./access-link-model.mjs";
 import {createEventControl} from "./editor-jornadas-control.mjs";
 import {
@@ -480,27 +478,54 @@ async function refreshFromServer(){
   }catch(e){notice("Error leyendo versión confirmada · "+err(e),"error")}
   emit();
 }
-async function downloadCoordinatorReceipt(id){
-  if(role!=="coordinador"||!ready)throw Error("Solo coordinación puede exportar comprobantes del equipo.");
-  const log=logs.get(id),board=baseBoard?.payload;
-  const person=board?.people?.find(p=>p.id===log?.personId);
-  const event=board?.events?.find(e=>e.id===log?.eventId);
-  const ownerUid=person?.authUid;
-  if(!log||!person||!event||!ownerUid||log.ownerUid!==ownerUid)
-    throw Error("El reporte requiere evento, personal vinculado y propietario autorizado.");
-  const clock=await getDocFromServer(doc(fs,"agora_ops_clock",ownerUid+"_"+event.id));
-  if(!clock.exists()||clock.data()?.status!=="finalizada")
-    throw Error("Primero se necesita el marcaje de entrada y salida certificado por Firebase.");
-  const file=await downloadReceiptPdf(receiptData({log,event:{...event,overtimePolicy:overtimePolicy(board.settings,event.project)},clock:clock.data(),person,personId:person.id}));
-  notice("Comprobante descargado: "+file+". Adjunta este PDF en Recursos y Pagos.","ok");
-  return file;
+/**
+ * Validación de tiempos exclusivamente operativos.
+ * La fuente de verdad son las dos marcas firmadas por hora de Firebase.
+ * El registro aprobado queda en agora_ops_logs y será consumible por la
+ * futura herramienta de Pagos mediante sus propios controles de acceso.
+ */
+async function reviewAttendance(id,decision,comment=""){
+  if(role!=="coordinador"||!ready||!account)
+    throw Error("Solo coordinación puede validar o devolver jornadas.");
+  const schedule=baseBoard?.payload;
+  const ref=doc(fs,"agora_ops_logs",id);
+  const result=await runTransaction(fs,async tx=>{
+    const snap=await tx.get(ref);
+    if(!snap.exists())throw Error("No existe ese reporte.");
+    const log=snap.data();
+    if(log.paymentStatus!=="solicitado")throw Error("El reporte ya no está pendiente de validación.");
+    const member=schedule?.people?.find(p=>p.id===log.personId);
+    const event=schedule?.events?.find(e=>e.id===log.eventId);
+    if(!member||!event||!member.authUid||member.authUid!==log.ownerUid||
+       !event.staff?.some(a=>a.personId===log.personId))
+      throw Error("La persona o actividad no corresponden a una asignación autorizada.");
+    const clockSnap=await tx.get(doc(fs,"agora_ops_clock",log.ownerUid+"_"+log.eventId));
+    if(!clockSnap.exists())throw Error("Falta el registro oficial de asistencia.");
+    const verified=verifiedAttendance({log,clock:clockSnap.data()});
+    if(decision==="return"){
+      const note=String(comment||"").trim().slice(0,240);
+      if(note.length<4)throw Error("Indica por qué se devuelve el reporte.");
+      tx.update(ref,{paymentStatus:"revision",returnNote:note,
+        updatedAt:serverTimestamp(),revision:Number(log.revision||0)+1});
+      return {state:"revision"};
+    }
+    if(decision!=="approve")throw Error("Acción no permitida.");
+    tx.update(ref,{paymentStatus:"validado",
+      approvedHours:verified.approvedHours,returnNote:"",
+      updatedAt:serverTimestamp(),revision:Number(log.revision||0)+1});
+    return {state:"validado",hours:verified.approvedHours};
+  });
+  notice(result.state==="validado"?
+    "Horas validadas. El registro queda disponible en Firebase para la futura herramienta de Pagos.":
+    "Reporte devuelto a Staff para corrección.","ok");
+  return result;
 }
 window.AGORA_OPS_BRIDGE={
   get ready(){return ready},get role(){return role},
   get personId(){return personId},
   get coordinatorName(){return role==='coordinador'?(account?.displayName||account?.email||'Coordinación'):'Coordinación'},
   save:store,
-  downloadReceipt:downloadCoordinatorReceipt,
+  reviewAttendance,
   openJornadasControl:()=>{if(role==="coordinador"&&ready)opsJornadas.open()},
   guardAction(action){
     if(!ready||saving){notice("La sincronización está ocupada.","pending");return false;}
