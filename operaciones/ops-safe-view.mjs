@@ -5,7 +5,7 @@ const str = (v, limit=300) => String(v ?? "").slice(0, limit);
 const num = (v) => Number.isFinite(Number(v)) ? Number(v) : 0;
 const field = (object, allowed) => Object.fromEntries(allowed.filter(k => object?.[k] !== undefined).map(k => [k, object[k]]));
 const staffEventFields = [
-  "id","seriesId","dayCount","dayIndex","title","project","campaign",
+  "id","seriesId","dayCount","dayIndex","title","project","campaign","region",
   "siteId","venueName","venueAddress","location","origin","stops",
   "type","workMode","status","start","end","before","after","travelMin","routeBufferMin","notes"
 ];
@@ -65,7 +65,7 @@ export function projectViewerView(board) {
     const site=sites.get(e.siteId) || {};
     return {
       id:str(e.id,100),seriesId:str(e.seriesId,100),title:str(e.title,120),
-      type:str(e.type,80),project:str(e.project,120),campaign:str(e.campaign,120),
+      type:str(e.type,80),project:str(e.project,120),campaign:str(e.campaign,120),region:str(e.region || site.city,80),
       venueName:str(e.venueName || site.name || e.location,160),
       venueAddress:str(e.venueAddress || site.address,300),
       location:str(e.location,200),origin:str(e.origin,300),stops:str(e.stops,500),

@@ -19,6 +19,7 @@ on:
       - "operaciones/ops-breaks.mjs"
       - "operaciones/ops-reminders.mjs"
       - "operaciones/ops-route-estimate.mjs"
+      - "operaciones/ops-safe-view.mjs"
       - "operaciones/control-jornadas*"
       - "operaciones/visor-live.js"
       - "operaciones/tests/**"
@@ -78,6 +79,9 @@ jobs:
           node --check operaciones/staff-dashboard.mjs
           node --check operaciones/jornadas-live.js
           node operaciones/tests/qa-staff-dashboard.mjs
+
+      - name: Validar formulario simple, regiones y tablero GPS consentido
+        run: node operaciones/tests/qa-region-live.mjs
 
       - name: Validar control por actividad y cálculo de horarios
         run: |
