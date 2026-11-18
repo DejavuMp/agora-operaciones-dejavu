@@ -6,6 +6,8 @@
  */
 import "../firebase-init.js";
 import {projectStaffView} from "./ops-safe-view.mjs";
+import {receiptData} from "./ops-receipt.mjs";
+import {downloadReceiptPdf} from "./ops-pdf-download.mjs";
 import {availablePeople,personForLink} from "./access-link-model.mjs";
 import {createEventControl} from "./editor-jornadas-control.mjs";
 import {
@@ -24,6 +26,8 @@ const SCHEDULE = doc(fs, "agora_ops_control", "schedule");
 const LOGLIST = collection(fs, "agora_ops_logs");
 const INCIDENTLIST = collection(fs, "agora_ops_incidents");
 const CLOCKLIST = collection(fs, "agora_ops_clock");
+const BREAKLIST = collection(fs, "agora_ops_breaks");
+const TRIPLIST = collection(fs, "agora_ops_trips");
 const REQUESTS = collection(fs, "agora_ops_access_requests");
 const keys = ["people","vehicles","events","blocks","sites","campaigns","settings","audit"];
 const blank = () => ({people:[],vehicles:[],events:[],blocks:[],sites:[],campaigns:[],settings:{
@@ -31,6 +35,7 @@ const blank = () => ({people:[],vehicles:[],events:[],blocks:[],sites:[],campaig
 },audit:[],logs:[],incidents:[]});
 let account=null,role=null,personId="",baseBoard=null,saving=false,ready=false;
 let logs = new Map(),incidents = new Map(),requests = new Map();
+let todayClocks=[],liveBreaks=[],liveTrips=[];
 let linkingUid=null;
 let unwatches=[],dirtyWaiting=false,authVersion=0,view=null;
 const root=document.getElementById("ops-gate");
@@ -64,6 +69,7 @@ function stop(){
   opsJornadas.stop();
   for(const off of unwatches.splice(0))try{off()}catch(_){}
   role=null;personId="";baseBoard=null;logs.clear();incidents.clear();requests.clear();
+  todayClocks=[];liveBreaks=[];liveTrips=[];
   saving=false;ready=false;dirtyWaiting=false;
   app?.reset?.();
 }
@@ -113,17 +119,29 @@ function loadCoordinator(){
     if(initialized)emit();
   });
   listen(REQUESTS,snap=>{requests=new Map(snap.docs.map(d=>[d.id,{...d.data(),id:d.id}]));renderRequests()});
-  // Solo coordinación puede leer marcajes de todo el equipo (Firestore Rules).
-  // Se usa el último punto consentido; no se almacena un recorrido adicional.
-  const liveOff=onSnapshot(query(CLOCKLIST,where("status","==","en_curso")),
+  // Coordinación: consultar marcajes recientes y estados del turno.
+  // Ventana de 48 h para incluir jornadas que cruzan medianoche.
+  // Nunca se guarda un recorrido ni se comparten marcajes con cuentas sin autorización.
+  const publishPresence=()=>app?.applyLive?.(todayClocks,{breaks:liveBreaks,trips:liveTrips});
+  const liveOff=onSnapshot(query(CLOCKLIST,where("startedAt",">=",new Date(Date.now()-48*3600000))),
     {includeMetadataChanges:true},snap=>{
       if(snap.metadata.fromCache)return;
-      app?.applyLive?.(snap.docs.map(d=>({...d.data(),id:d.id})));
+      todayClocks=snap.docs.map(d=>({...d.data(),id:d.id}));publishPresence();
     },error=>{
-      notice("Marcajes en vivo no disponibles · "+err(error),"pending");
-      app?.applyLive?.([]);
+      notice("Marcajes recientes no disponibles · "+err(error),"pending");
+      todayClocks=[];publishPresence();
     });
-  unwatches.push(liveOff);
+  const breakOff=onSnapshot(query(BREAKLIST,where("status","==","en_descanso")),
+    {includeMetadataChanges:true},snap=>{
+      if(snap.metadata.fromCache)return;
+      liveBreaks=snap.docs.map(d=>({...d.data(),id:d.id}));publishPresence();
+    },error=>{notice("Estado de descansos no disponible · "+err(error),"pending");liveBreaks=[];publishPresence()});
+  const tripOff=onSnapshot(query(TRIPLIST,where("status","==","en_ruta")),
+    {includeMetadataChanges:true},snap=>{
+      if(snap.metadata.fromCache)return;
+      liveTrips=snap.docs.map(d=>({...d.data(),id:d.id}));publishPresence();
+    },error=>{notice("Estado de traslados no disponible · "+err(error),"pending");liveTrips=[];publishPresence()});
+  unwatches.push(liveOff,breakOff,tripOff);
 }
 function loadStaff(uid,id){
   role="personal";personId=id;
@@ -461,10 +479,26 @@ async function refreshFromServer(){
   }catch(e){notice("Error leyendo versión confirmada · "+err(e),"error")}
   emit();
 }
+async function downloadCoordinatorReceipt(id){
+  if(role!=="coordinador"||!ready)throw Error("Solo coordinación puede exportar comprobantes del equipo.");
+  const log=logs.get(id),board=baseBoard?.payload;
+  const person=board?.people?.find(p=>p.id===log?.personId);
+  const event=board?.events?.find(e=>e.id===log?.eventId);
+  const ownerUid=person?.authUid;
+  if(!log||!person||!event||!ownerUid||log.ownerUid!==ownerUid)
+    throw Error("El reporte requiere evento, personal vinculado y propietario autorizado.");
+  const clock=await getDocFromServer(doc(fs,"agora_ops_clock",ownerUid+"_"+event.id));
+  if(!clock.exists()||clock.data()?.status!=="finalizada")
+    throw Error("Primero se necesita el marcaje de entrada y salida certificado por Firebase.");
+  const file=await downloadReceiptPdf(receiptData({log,event,clock:clock.data(),person,personId:person.id}));
+  notice("Comprobante descargado: "+file+". Adjunta este PDF en Recursos y Pagos.","ok");
+  return file;
+}
 window.AGORA_OPS_BRIDGE={
   get ready(){return ready},get role(){return role},
   get personId(){return personId},
   save:store,
+  downloadReceipt:downloadCoordinatorReceipt,
   openJornadasControl:()=>{if(role==="coordinador"&&ready)opsJornadas.open()},
   guardAction(action){
     if(!ready||saving){notice("La sincronización está ocupada.","pending");return false;}

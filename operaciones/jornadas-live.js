@@ -327,7 +327,7 @@ function renderPayments(events){
       (summary?'<button type="button" data-print-report="'+esc(l.id)+'">Ver comprobante / Guardar PDF</button>':'')+
       (action?(hasPriorApproved?
         '<p>Este registro contiene una validación anterior y requiere revisión de coordinación para reenviarse.</p>':
-        '<button type="button" class="primary" data-request-payment="'+esc(l.id)+'" '+(busy||!canRequest?"disabled":"")+'>Enviar solicitud de pago</button>'):"")+
+        '<button type="button" class="primary" data-request-payment="'+esc(l.id)+'" '+(busy||!canRequest?"disabled":"")+'>Solicitar revisión de horas</button>'):"")+
       '</article>';
   }).join("");
   $("j-payment-list").innerHTML=unreportedHtml+existingHtml||

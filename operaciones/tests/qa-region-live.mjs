@@ -22,8 +22,8 @@ assert.match(inline,/function openLiveMap\(\)/,"Carga explícita del mapa");
 assert.match(inline,/function mapPoints\(\)/,"Mapa usa solo GPS reciente");
 assert.match(inline,/tile.openstreetmap.org/,"Mapas gratuitos de OSM");
 
-assert.match(cloud,/onSnapshot\(query\(CLOCKLIST,where\("status","==","en_curso"\)\)/,
-  "Solo se escucha el marcaje activo");
+assert.match(cloud,/where\("startedAt",">=",new Date\(Date\.now\(\)-48\*3600000\)\)/,
+  "Se escuchan estados de marcajes recientes, no solo los activos");
 assert.match(projection,/"campaign","region"/,"Región disponible en la vista personal");
 assert.match(projection,/region:str\(/,"Región disponible en el visor");
 const extract=(start,end)=> {
