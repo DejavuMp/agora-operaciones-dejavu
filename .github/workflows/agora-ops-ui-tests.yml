@@ -17,6 +17,7 @@ on:
       - "operaciones/ops-receipt.mjs"
       - "operaciones/ops-pdf-download.mjs"
       - "operaciones/ops-paga.mjs"
+      - "operaciones/ops-attendance-review.mjs"
       - "operaciones/ops-monthly-receipt.mjs"
       - "operaciones/ops-breaks.mjs"
       - "operaciones/ops-reminders.mjs"
@@ -76,10 +77,10 @@ jobs:
           node --check operaciones/ops-timekeeping.mjs
           node --check operaciones/ops-receipt.mjs
           node operaciones/tests/qa-timekeeping-receipt.mjs
-      - name: Validar tabulador PAGA protegido y horas extra por proyecto
+      - name: Verificar flujo de aceptación y validación operativa sin pagos
         run: |
-          node --check operaciones/ops-paga.mjs
-          node operaciones/tests/qa-paga-assignments.mjs
+          node --check operaciones/ops-attendance-review.mjs
+          node operaciones/tests/qa-attendance-separation.mjs
       - name: Validar PDF descargable y estados de Staff por región
         run: |
           node --check operaciones/ops-pdf-download.mjs

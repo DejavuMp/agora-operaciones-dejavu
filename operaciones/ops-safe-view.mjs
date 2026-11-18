@@ -1,7 +1,6 @@
 /* ÁGORA Operaciones: vistas mínimas, sin sueldos ajenos ni registros privados.
  * Las reglas de Firestore, no este módulo, deciden qué documentos puede leer cada usuario.
  */
-import {overtimePolicy} from "./ops-paga.mjs";
 const str = (v, limit=300) => String(v ?? "").slice(0, limit);
 const num = (v) => Number.isFinite(Number(v)) ? Number(v) : 0;
 const field = (object, allowed) => Object.fromEntries(allowed.filter(k => object?.[k] !== undefined).map(k => [k, object[k]]));
@@ -17,10 +16,8 @@ export function projectStaffView(person, board) {
     .map(e => ({
       ...field(e, staffEventFields),
       vehicles: (e.vehicles || []).slice(0, 50),
-      overtimePolicy:overtimePolicy(board.settings,e.project),
       staff: (e.staff || []).filter(a => a.personId === person.id).map(a => field(a, [
-        "personId","start","end","assignedByName","assignedAt","rateSource","rateReference",
-        "rateUnit","rateAmount","paymentMethod"
+        "personId","start","end","assignedByName","assignedAt"
       ]))
     }));
   const units = new Set(mine.flatMap(e => e.vehicles || []));

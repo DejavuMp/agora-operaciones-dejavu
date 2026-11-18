@@ -8,11 +8,11 @@ assert.match(cloud,/where\("startedAt",">=",new Date\(Date\.now\(\)-48\*3600000\
   "Coordinación consulta jornadas recientes, incluidas las terminadas");
 assert.match(cloud,/where\("status","==","en_descanso"\)/,"Se escuchan descansos en curso");
 assert.match(cloud,/where\("status","==","en_ruta"\)/,"Se escuchan traslados en curso");
-assert.match(cloud,/downloadCoordinatorReceipt/,"Coordinación descarga PDF al completar jornada");
-assert.match(html,/data-action="receipt-pdf"/,"Comprobante de jornada accesible en coordinación");
-assert.match(staff,/data-download-report/,"Staff descarga comprobante PDF propio");
-assert.match(staff,/downloadMonthlyPdf/,"Staff descarga resumen mensual");
-assert.match(visor,/id="j-download-month-pdf"/,"Botón de resumen PDF mensual");
+assert.match(cloud,/reviewAttendance/,"Coordinación valida horas oficiales");
+assert.doesNotMatch(cloud,/downloadCoordinatorReceipt/,"No se exportan archivos para Pagos");
+assert.doesNotMatch(html,/data-action="receipt-pdf"/,"No se ofrecen PDF económicos");
+assert.match(staff,/Confirmo mis horas y las envío a coordinación/,"Staff confirma horas");
+assert.match(visor,/Validación de horas/,"Staff solo ve validación operativa");
 const start=html.indexOf("function opsPresenceRows("),end=html.indexOf("function renderLiveDashboard(){",start);
 assert.ok(start>0&&end>start);
 const logic=html.slice(start,end);
@@ -58,4 +58,4 @@ const panel=renderPanel(db,clocks,breaks,trips,getPerson,startOfDay,plusDays,iso
 for(const label of ["Trabajando","En descanso","En traslado","Sin entrada","Jornada terminada","Programado"]){
   assert.ok(panel.includes(label),"El dashboard muestra estado "+label);
 }
-console.log("OK: presencia por estado, descansos, traslados, terminados y PDF para pagos.");
+console.log("OK: presencia por estado y validación de horas sin pagos.");
