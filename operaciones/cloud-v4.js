@@ -23,6 +23,7 @@ const base = "../";
 const SCHEDULE = doc(fs, "agora_ops_control", "schedule");
 const LOGLIST = collection(fs, "agora_ops_logs");
 const INCIDENTLIST = collection(fs, "agora_ops_incidents");
+const CLOCKLIST = collection(fs, "agora_ops_clock");
 const REQUESTS = collection(fs, "agora_ops_access_requests");
 const keys = ["people","vehicles","events","blocks","sites","campaigns","settings","audit"];
 const blank = () => ({people:[],vehicles:[],events:[],blocks:[],sites:[],campaigns:[],settings:{
@@ -112,6 +113,17 @@ function loadCoordinator(){
     if(initialized)emit();
   });
   listen(REQUESTS,snap=>{requests=new Map(snap.docs.map(d=>[d.id,{...d.data(),id:d.id}]));renderRequests()});
+  // Solo coordinación puede leer marcajes de todo el equipo (Firestore Rules).
+  // Se usa el último punto consentido; no se almacena un recorrido adicional.
+  const liveOff=onSnapshot(query(CLOCKLIST,where("status","==","en_curso")),
+    {includeMetadataChanges:true},snap=>{
+      if(snap.metadata.fromCache)return;
+      app?.applyLive?.(snap.docs.map(d=>({...d.data(),id:d.id})));
+    },error=>{
+      notice("Marcajes en vivo no disponibles · "+err(error),"pending");
+      app?.applyLive?.([]);
+    });
+  unwatches.push(liveOff);
 }
 function loadStaff(uid,id){
   role="personal";personId=id;
