@@ -47,4 +47,15 @@ for(const [person,expected] of [["p1","descanso"],["p2","trabajando"],["p3","tra
  ["p4","finalizado"],["p5","sin_entrada"],["p6","sin_cuenta"],["p7","programado"]]){
  assert.equal(rows.find(x=>x.personId===person)?.code,expected,person+" status");
 }
+const renderStart=html.indexOf("function opsPresenceRows("),
+  renderEnd=html.indexOf("function renderOpsBoard(){",renderStart);
+const renderSource=html.slice(renderStart,renderEnd);
+const renderPanel=new Function("db","liveClocks","liveBreaks","liveTrips","getPerson",
+ "startOfDay","plusDays","isoLocal","overlap","dateMs","eventRegion","liveCoordinates",
+ "ui","esc","getSite",renderSource+";return renderLiveDashboard()");
+const panel=renderPanel(db,clocks,breaks,trips,getPerson,startOfDay,plusDays,isoLocal,overlap,
+  dateMs,e=>e.region,()=>null,{role:"coordinador"},s=>String(s),()=>null);
+for(const label of ["Trabajando","En descanso","En traslado","Sin entrada","Jornada terminada","Programado"]){
+  assert.ok(panel.includes(label),"El dashboard muestra estado "+label);
+}
 console.log("OK: presencia por estado, descansos, traslados, terminados y PDF para pagos.");
