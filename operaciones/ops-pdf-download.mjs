@@ -20,6 +20,9 @@ export function receiptPdfRows(data){
   const rows=[
     ["Folio",data.folio],["Integrante",data.name],["Actividad",data.activity],
     ["Modalidad",data.type],["Campaña / proyecto",data.campaign],
+    ["Asignado por",data.assignedByName],["Pago base acordado",data.agreedBase],
+    ["Tarifa acordada",data.agreedRate],["Forma de pago",data.paymentMethod],
+    ["Horas extras del proyecto",data.overtimeRate],["Estimación de horas extras (por validar)",data.overtimeEstimate],
     ["Sucursal / sede",data.site],["Entrada registrada",data.officialStart],
     ["Salida registrada",data.officialEnd],["Horas programadas",data.planned],
     ["Tiempo transcurrido",data.gross],["Descanso",data.rest],

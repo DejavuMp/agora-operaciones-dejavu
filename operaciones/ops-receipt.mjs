@@ -1,6 +1,7 @@
 /** Comprobante personal imprimible. No contiene GPS, selfie ni datos bancarios. */
 import {timeStatement,workModeLabel,hours} from "./ops-timekeeping.mjs";
 import {instant} from "./jornadas-logic.mjs";
+import {agreedAmount,methodName} from "./ops-paga.mjs";
 const safe=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const stamp=v=>{
   const n=instant(v);
@@ -20,6 +21,13 @@ export function receiptData({log,event,clock,person,personId}){
   if(clock.status!=="finalizada"||!Number.isFinite(instant(clock.endedAt)))
     throw Error("La jornada todavía no tiene salida certificada.");
   const summary=timeStatement({clock,event,personId,breakMins:log.breakMins||0});
+  const assignment=(event.staff||[]).find(a=>a.personId===personId)||{};
+  const baseAmount=agreedAmount(assignment);
+  const ot=event.overtimePolicy;
+  const overtimeHourlyRate=ot?.mode==="tarifa_hora"&&Number(ot.hourlyRate)>0?Number(ot.hourlyRate):null;
+  const overtimeEstimated=overtimeHourlyRate===null?null:
+    Math.round(summary.overtimeCandidateMinutes*overtimeHourlyRate/60*100)/100;
+  const money=value=>new Intl.NumberFormat("es-MX",{style:"currency",currency:"MXN"}).format(value);
   return {
     folio:"AGO-"+new Intl.DateTimeFormat("en-US",{timeZone:"America/Mexico_City",year:"numeric",month:"2-digit",day:"2-digit"}).formatToParts(instant(clock.startedAt)).filter(p=>["year","month","day"].includes(p.type)).sort((a,b)=>({year:0,month:1,day:2}[a.type]-({year:0,month:1,day:2}[b.type]))).map(p=>p.value).join("")+"-"+idHash(log.id),
     name:person.name||"Integrante de Dejavú Marketing",
@@ -35,6 +43,12 @@ export function receiptData({log,event,clock,person,personId}){
     status:log.paymentStatus||"capturado",
     hasUnapprovedOvertime:summary.reviewRequired,
     validatedHours:typeof log.approvedHours==="number"?hours(log.approvedHours*60):null,
+    assignedByName:assignment.assignedByName||"Coordinación",
+    agreedBase:baseAmount===null?"Pendiente de acuerdo":money(baseAmount),
+    agreedRate:assignment.rateAmount?money(assignment.rateAmount)+(assignment.rateUnit==="hora"?"/h":"/jornada"):"Por definir",
+    paymentMethod:methodName(assignment.paymentMethod),
+    overtimeRate:overtimeHourlyRate===null?"Por definir para el proyecto":money(overtimeHourlyRate)+"/h, por validar",
+    overtimeEstimate:overtimeEstimated===null?"No calculado":money(overtimeEstimated)+" estimados, por validar",
     notes:String(log.notes||"").slice(0,600)
   };
 }
@@ -58,7 +72,13 @@ export function receiptHtml(data){
     '<p>Registro individual de horas y actividades</p></div>'+
     '<div><small>FOLIO DE CONSULTA</small><p class="folio">'+x("folio")+'</p><span class="pill">'+x("status")+'</span></div></header>'+
     '<h2>Datos de la actividad</h2><dl>'+
-    '<dt>Integrante</dt><dd>'+x("name")+'</dd>'+
+    '<dt>Integrante</dt><dd>'+x("name")+'</dd>'+ 
+    '<dt>Asignado por</dt><dd>'+x("assignedByName")+'</dd>'+ 
+    '<dt>Pago base acordado</dt><dd>'+x("agreedBase")+'</dd>'+ 
+    '<dt>Tarifa acordada</dt><dd>'+x("agreedRate")+'</dd>'+ 
+    '<dt>Forma de pago</dt><dd>'+x("paymentMethod")+'</dd>'+ 
+    '<dt>Horas extra del proyecto</dt><dd>'+x("overtimeRate")+'</dd>'+ 
+    '<dt>Estimación de excedente</dt><dd>'+x("overtimeEstimate")+'</dd>'+
     '<dt>Modalidad</dt><dd>'+x("type")+'</dd>'+
     '<dt>Actividad</dt><dd>'+x("activity")+'</dd>'+
     '<dt>Campaña / proyecto</dt><dd>'+x("campaign")+'</dd>'+

@@ -19,6 +19,7 @@ import {receiptData,receiptHtml} from "./ops-receipt.mjs";
 import {downloadReceiptPdf,downloadMonthlyPdf} from "./ops-pdf-download.mjs";
 import {ownMonthReport,monthlyReceiptHtml} from "./ops-monthly-receipt.mjs";
 import {ownBreaks,openBreak,nextBreakSlot,verifiedBreakSummary} from "./ops-breaks.mjs";
+import {agreedAmount,methodName} from "./ops-paga.mjs";
 import {eligibleNotices} from "./ops-reminders.mjs";
 const {auth,firestore:fs}=window.AGORA_FIREBASE||{};
 const $=id=>document.getElementById(id);
@@ -85,6 +86,22 @@ const statusOf=e=>{
 const eventSite=e=>(staff?.sites||[]).find(s=>s.id===e.siteId);
 const destination=e=>e?.venueAddress||eventSite(e)?.address||e?.venueName||eventSite(e)?.name||e?.location||"";
 const placeLabel=e=>e?.venueName||eventSite(e)?.name||e?.location||"Por confirmar";
+const currencyMXN=n=>new Intl.NumberFormat("es-MX",{style:"currency",currency:"MXN"}).format(n);
+function assignmentPaymentHtml(e){
+  const assignment=shiftOf(e,personId),amount=agreedAmount(assignment);
+  const rate=Number(assignment.rateAmount);
+  const agreed=amount===null?"Pendiente de acuerdo":currencyMXN(amount);
+  const per=assignment.rateUnit==="hora"?"por hora":"por jornada / servicio";
+  const rateLabel=assignment.rateUnit==="hora"&&Number.isFinite(rate)&&rate>0?
+    " · "+currencyMXN(rate)+"/h":"";
+  const extra=e?.overtimePolicy?.mode==="tarifa_hora"&&Number(e.overtimePolicy.hourlyRate)>0?
+    "Tarifa de referencia para horas extras del proyecto: "+currencyMXN(e.overtimePolicy.hourlyRate)+"/h, sujeta a validación.":
+    "Horas extras del proyecto: pendientes de revisión por coordinación.";
+  return '<div class="staff-payment-terms"><p><b>Asignado por:</b> '+esc(assignment.assignedByName||"Coordinación")+'</p>'+
+    '<p><b>Pago acordado:</b> '+esc(agreed)+' ('+esc(per)+')'+esc(rateLabel)+'</p>'+
+    '<p><b>Forma de pago:</b> '+esc(methodName(assignment.paymentMethod))+'</p>'+
+    '<p class="disclaimer">'+esc(extra)+' Este importe no acredita una transferencia ni un pago realizado.</p></div>';
+}
 const tripLabel=e=>e?.vehicles?.length?
   e.vehicles.map(id=>(staff?.vehicles||[]).find(v=>v.id===id)?.name||"Unidad asignada").join(", "):"Sin camioneta asignada";
 const eventDescription=e=>{
@@ -135,7 +152,7 @@ function renderHome(events){
     '<p><b>'+esc(dateLabel(eventStart(featured,personId)))+'</b></p>'+
     '<p>'+eventDescription(featured)+'</p>'+
     '<p>Campaña: '+esc(featured.campaign||featured.project||"No especificada")+'</p>'+
-    '<p>Transporte: '+esc(tripLabel(featured))+'</p>'+
+    '<p>Transporte: '+esc(tripLabel(featured))+'</p>'+assignmentPaymentHtml(featured)+
     '<div class="staff-featured-actions"><button type="button" class="primary" data-open-event="'+esc(featured.id)+'" data-open-tab="asistencia">Marcar jornada</button>'+
     '<button type="button" data-open-event="'+esc(featured.id)+'" data-open-tab="traslados">Ver traslado</button></div></div>';
   const others=upcoming.filter(e=>e.id!==featured.id).slice(0,4);
@@ -178,7 +195,7 @@ function renderChronogram(events){
         '<div><strong>'+esc(e.title||e.type||"Actividad")+'</strong>'+
         '<small>'+esc(e.type||"Actividad")+' · '+esc(e.campaign||e.project||"Sin campaña")+' · '+esc(placeLabel(e))+
         (e.dayCount>1?' · Jornada '+esc(e.dayIndex||1)+' de '+esc(e.dayCount):"")+
-        '</small><small>Vehículo: '+esc(tripLabel(e))+'</small></div>'+
+        '</small><small>Vehículo: '+esc(tripLabel(e))+'</small><small>Asignado por: '+esc(shiftOf(e,personId).assignedByName||'Coordinación')+'</small></div>'+
         '<div class="staff-event-actions"><button type="button" data-open-event="'+esc(e.id)+'" data-open-tab="asistencia">Asistencia</button>'+
         '<button type="button" data-open-event="'+esc(e.id)+'" data-open-tab="traslados">Traslado</button></div></article>';
     }).join("")+'</div>'
@@ -227,7 +244,7 @@ function renderAttendance(){
   const existingActivity=$("start-activity")?.value||"";
   $("j-active").innerHTML='<div class="card"><b>'+esc(e.title||"Jornada")+'</b>'+
     '<p>Horario asignado: '+esc(when(eventStart(e,personId)))+' a '+esc(when(eventEnd(e,personId)))+'</p>'+
-    '<p>Sede: '+esc(placeLabel(e))+'</p>'+
+    '<p>Sede: '+esc(placeLabel(e))+'</p>'+assignmentPaymentHtml(e)+
     (r?'<p><b>Entrada oficial:</b> '+esc(when(r.startedAt))+'<br>'+linkGeo(r.startGeo,"Ver punto de entrada")+'</p>':"")+
     (ended?'<p><b>Salida oficial:</b> '+esc(when(r.endedAt))+'<br>'+linkGeo(r.endGeo,"Ver punto de salida")+
       '</p><p>Actividad realizada: '+esc(r.endNote||"Sin descripción")+'</p>':"")+

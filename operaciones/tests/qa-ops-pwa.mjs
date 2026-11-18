@@ -13,6 +13,7 @@ for(const icon of m.icons){
 const sw=fs.readFileSync(path.join(root,"sw.js"),"utf8");
 assert.ok(sw.includes("caches.open"));
 assert.ok(sw.includes("ops-pdf-download.mjs"),"El exportador PDF propio forma parte de la app instalable");
+assert.ok(sw.includes("ops-paga.mjs"),"El catálogo PAGA se carga sin datos de tarifas públicas");
 assert.ok(sw.includes("req.method!==\"GET\""),"no interceptar escrituras");
 assert.ok(sw.includes("url.origin!==self.location.origin"),"no interceptar dominios Firebase");
 assert.ok(sw.includes("!STATIC.has(url.pathname)"),"solo cachear shell explícito");
