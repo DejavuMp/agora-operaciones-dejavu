@@ -14,6 +14,11 @@ assert.match(inline,/formField\('ev-region'/,"Región de texto libre");
 assert.match(inline,/id="board-region"/,"Filtro regional");
 assert.match(inline,/ops-region-header/,"Agrupación regional del cronograma");
 assert.match(inline,/renderLiveDashboard/,"Panel de equipo en vivo");
+assert.match(inline,/data-action="live-map"/,"Mapa visible solo tras acción de coordinación");
+assert.match(inline,/function openLiveMap\(\)/,"Carga explícita del mapa");
+assert.match(inline,/function mapPoints\(\)/,"Mapa usa solo GPS reciente");
+assert.match(inline,/tile.openstreetmap.org/,"Mapas gratuitos de OSM");
+
 assert.match(cloud,/onSnapshot\(query\(CLOCKLIST,where\("status","==","en_curso"\)\)/,
   "Solo se escucha el marcaje activo");
 assert.match(projection,/"campaign","region"/,"Región disponible en la vista personal");
