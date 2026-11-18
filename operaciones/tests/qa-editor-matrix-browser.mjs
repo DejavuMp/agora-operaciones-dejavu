@@ -47,6 +47,8 @@ try{
  await context.route("https://www.gstatic.com/firebasejs/13.1.0/firebase-firestore.js",r=>r.fulfill({status:200,headers,body:db}));
  const page=await context.newPage();page.on("pageerror",ex=>errors.push(ex.message));
  await page.goto("http://127.0.0.1:8765/operaciones/",{waitUntil:"domcontentloaded"});
+ await page.locator("#app [data-nav='calendario']").first().waitFor({state:"visible",timeout:12000});
+ await page.locator("#app [data-nav='calendario']").first().click();
  await page.locator("#app [data-action='board-view-cronograma']").waitFor({state:"visible",timeout:12000});
  await page.locator("[data-action='board-view-cronograma']").first().click();
  await page.locator(".ops-matrix").waitFor({state:"visible"});
@@ -72,6 +74,12 @@ try{
  assert.equal(await page.locator("#ops-people-suggestions option").first().getAttribute("value"),"Ana QA");
  assert.ok(await page.locator("#ev-work-mode").isVisible());
  assert.ok(await page.locator("#ops-planned-hours").isVisible());
+ await page.locator("#ev-duration").fill("6");
+ assert.equal(await page.evaluate(()=>{
+   const start=new Date(document.querySelector("#ev-start").value);
+   const end=new Date(document.querySelector("#ev-end").value);
+   return (end-start)/3600000;
+ }),6,"La hora final se calcula automáticamente a partir de la duración");
  await page.locator("#ev-work-mode").selectOption("jornada_campo");
  assert.equal(await page.locator("#ev-work-mode").inputValue(),"jornada_campo");
  // La estimación sin costo funciona con coordenadas sin consultar servicios externos.
