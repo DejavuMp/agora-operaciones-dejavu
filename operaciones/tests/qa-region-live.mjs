@@ -8,9 +8,9 @@ const inline=[...html.matchAll(/<script([^>]*)>([\s\S]*?)<\/script>/g)]
   .find(([,attributes,content])=>!attributes.includes("src=")&&content.includes("function renderOpsBoard"))?.[2];
 assert.ok(inline,"Se encontró el editor de Operaciones");
 assert.doesNotThrow(()=>new Function(inline),"Sintaxis JavaScript del editor");
-assert.match(inline,/id="ev-duration"/,"Duración editable");
+assert.match(inline,/formField\('ev-duration'/,"Duración editable");
 assert.match(inline,/type="hidden" id="ev-end"/,"Fin ya no pide doble captura");
-assert.match(inline,/id="ev-region"/,"Región de texto libre");
+assert.match(inline,/formField\('ev-region'/,"Región de texto libre");
 assert.match(inline,/id="board-region"/,"Filtro regional");
 assert.match(inline,/ops-region-header/,"Agrupación regional del cronograma");
 assert.match(inline,/renderLiveDashboard/,"Panel de equipo en vivo");
