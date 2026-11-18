@@ -1,0 +1,8 @@
+node_modules/
+_site/
+.firebase/
+.github/firebase-staff/.preflight/
+*.log
+.env
+.env.*
+.DS_Store

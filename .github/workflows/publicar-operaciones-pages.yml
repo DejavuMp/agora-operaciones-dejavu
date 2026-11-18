@@ -1,0 +1,75 @@
+name: "ÁGORA · Publicar Operaciones (verificación previa)"
+on:
+  push:
+    branches: [main]
+    paths:
+      - "operaciones/**"
+      - "firebase-init.js"
+      - "icons/**"
+      - "firestore.rules"
+      - "index.html"
+      - ".github/workflows/publicar-operaciones-pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: agora-operaciones-pages
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: "Validar código y reglas antes de publicar"
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: Verificar código del visor y controles
+        run: |
+          node --check operaciones/cloud-v4.js
+          node --check operaciones/visor-live.js
+          node --check operaciones/jornadas-live.js
+          node operaciones/tests/qa-safe-view.mjs
+          node operaciones/tests/qa-route-estimate.mjs
+          node operaciones/tests/qa-ops-pwa.mjs
+          node operaciones/tests/qa-timekeeping-receipt.mjs
+      - name: Preparar emulador Firestore sin contactar producción
+        run: npm install --no-save 'firebase@^12.0.0' '@firebase/rules-unit-testing@^5.0.0' firebase-tools
+      - name: Verificar accesos de Operaciones en emulador
+        run: npx firebase emulators:exec --only firestore --project demo-agora-ops --non-interactive 'node .github/firebase-staff/test-ops-rules.mjs'
+      - name: Verificar horarios, jornadas, GPS y límites de horas
+        run: npx firebase emulators:exec --only firestore --project demo-agora-jornadas --non-interactive 'node .github/firebase-staff/test-clock-rules.mjs'
+
+  publish:
+    name: "Publicar sitio independiente solo después de pruebas"
+    needs: verify
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Preparar solo archivos públicos de Operaciones
+        run: |
+          mkdir -p _site
+          cp index.html firebase-init.js _site/
+          cp -R operaciones icons _site/
+          touch _site/.nojekyll
+      - uses: actions/configure-pages@v5
+        with:
+          enablement: true
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: _site
+      - id: deployment
+        uses: actions/deploy-pages@v4

@@ -1,0 +1,126 @@
+name: "ÁGORA · Operaciones · Pruebas visuales"
+on:
+  push:
+    branches: [main]
+    paths:
+      - "operaciones/demo.html"
+      - "operaciones/index.html"
+      - "operaciones/cloud-v4.js"
+      - "operaciones/access-link-model.mjs"
+      - "operaciones/editor-jornadas-control.mjs"
+      - "operaciones/visor.html"
+      - "operaciones/manifest.webmanifest"
+      - "operaciones/sw.js"
+      - "operaciones/jornadas*"
+      - "operaciones/staff-dashboard.mjs"
+      - "operaciones/ops-timekeeping.mjs"
+      - "operaciones/ops-receipt.mjs"
+      - "operaciones/ops-monthly-receipt.mjs"
+      - "operaciones/ops-breaks.mjs"
+      - "operaciones/ops-reminders.mjs"
+      - "operaciones/ops-route-estimate.mjs"
+      - "operaciones/control-jornadas*"
+      - "operaciones/visor-live.js"
+      - "operaciones/tests/**"
+      - ".github/workflows/agora-ops-ui-tests.yml"
+  pull_request:
+    paths:
+      - "operaciones/**"
+      - ".github/workflows/agora-ops-ui-tests.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  operaciones-ui:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Verificar proyecciones de seguridad sin Firebase de producción
+        run: node operaciones/tests/qa-safe-view.mjs
+      - name: Validar sintaxis de control, inicio de sesión y marcaje individual
+        run: |
+          node --check operaciones/jornadas-live.js
+          node --check operaciones/control-jornadas.js
+          node --check operaciones/visor-live.js
+      - name: Validar app instalable y caché privada
+        run: node operaciones/tests/qa-ops-pwa.mjs
+      - name: Validar ventanas, geolocalización y traslados
+        run: node operaciones/tests/qa-jornadas.mjs
+      - name: Validar revisión de excedentes por coordinación
+        run: node operaciones/tests/qa-extra-review.mjs
+      - name: Validar estimación gratuita de rutas y caché OSM
+        run: |
+          node --check operaciones/ops-route-estimate.mjs
+          node operaciones/tests/qa-route-estimate.mjs
+      - name: Validar recordatorios personales sin push
+        run: |
+          node --check operaciones/ops-reminders.mjs
+          node operaciones/tests/qa-reminders.mjs
+      - name: Validar descansos certificados y unión de pausas
+        run: |
+          node --check operaciones/ops-breaks.mjs
+          node operaciones/tests/qa-breaks.mjs
+      - name: Validar resumen mensual de días y horas propias
+        run: |
+          node --check operaciones/ops-monthly-receipt.mjs
+          node operaciones/tests/qa-monthly-receipt.mjs
+      - name: Validar horas, descansos declarados y comprobante personal
+        run: |
+          node --check operaciones/ops-timekeeping.mjs
+          node --check operaciones/ops-receipt.mjs
+          node operaciones/tests/qa-timekeeping-receipt.mjs
+      - name: Validar cronograma staff y pagos sin montos inventados
+        run: |
+          node --check operaciones/staff-dashboard.mjs
+          node --check operaciones/jornadas-live.js
+          node operaciones/tests/qa-staff-dashboard.mjs
+
+      - name: Validar control por actividad y cálculo de horarios
+        run: |
+          node --check operaciones/editor-jornadas-control.mjs
+          node operaciones/tests/qa-editor-event-control.mjs
+      - name: Validar lógica de vinculación individual y edición de fichas
+        run: |
+          node --check operaciones/cloud-v4.js
+          node operaciones/tests/qa-access-link.mjs
+
+      - name: Comprobar control de jornadas sin almacenamiento local
+        run: |
+          node -e "const fs=require('fs');for(const path of ['operaciones/jornadas-live.js','operaciones/control-jornadas.js']){const s=fs.readFileSync(path,'utf8');if(s.includes('localStorage')||!s.includes('onSnapshot')||!s.includes('serverTimestamp'))process.exit(1)}"
+      - name: Verificar que el visor de producción no use almacenamiento local
+        run: |
+          node -e "const fs=require('fs');const h=fs.readFileSync('operaciones/visor.html','utf8');const js=fs.readFileSync('operaciones/visor-live.js','utf8');if(h.includes('localStorage')||js.includes('localStorage'))process.exit(1);if(!js.includes('onSnapshot')||!js.includes('getDocFromServer'))process.exit(1)"
+      - name: Instalar navegador de pruebas en runner
+        run: |
+          npm install --no-save playwright
+          npx playwright install --with-deps chromium
+      - name: Levantar sólo archivos públicos locales
+        run: |
+          python3 -m http.server 8765 --bind 127.0.0.1 >/tmp/agora-http.log 2>&1 &
+          echo $! >/tmp/agora-http.pid
+          sleep 2
+      - name: Probar volanteo por jornada, horarios, empalmes y visor
+        run: node operaciones/tests/qa-visor-dia.mjs
+      - name: Simular visor con dos navegadores separados (no Firebase real)
+        run: node operaciones/tests/qa-visor-live-mock.mjs
+      - name: Simular marcaje personal GPS, cierre y traslado (sin Firebase real)
+        run: node operaciones/tests/qa-jornadas-live-mock.mjs
+      - name: Verificar solicitud inicial de acceso y privacidad del visor
+        run: node operaciones/tests/qa-visor-authorization-mock.mjs
+      - name: Probar matriz de cronograma, control de evento y autocompletado
+        run: node operaciones/tests/qa-editor-matrix-browser.mjs
+      - name: Probar vinculación de solicitudes desde el editor, sin Firebase real
+        run: node operaciones/tests/qa-access-link-browser.mjs
+
+      - name: Guardar vista de prueba
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: agora-operaciones-vista-dia
+          path: /tmp/agora-visor-qa.png
+          if-no-files-found: ignore
+          retention-days: 10
