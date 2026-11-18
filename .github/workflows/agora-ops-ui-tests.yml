@@ -15,6 +15,7 @@ on:
       - "operaciones/staff-dashboard.mjs"
       - "operaciones/ops-timekeeping.mjs"
       - "operaciones/ops-receipt.mjs"
+      - "operaciones/ops-pdf-download.mjs"
       - "operaciones/ops-monthly-receipt.mjs"
       - "operaciones/ops-breaks.mjs"
       - "operaciones/ops-reminders.mjs"
@@ -74,6 +75,12 @@ jobs:
           node --check operaciones/ops-timekeeping.mjs
           node --check operaciones/ops-receipt.mjs
           node operaciones/tests/qa-timekeeping-receipt.mjs
+      - name: Validar PDF descargable y estados de Staff por región
+        run: |
+          node --check operaciones/ops-pdf-download.mjs
+          node operaciones/tests/qa-ops-pdf-download.mjs
+          node operaciones/tests/qa-ops-status-pdf.mjs
+
       - name: Validar cronograma staff y pagos sin montos inventados
         run: |
           node --check operaciones/staff-dashboard.mjs
