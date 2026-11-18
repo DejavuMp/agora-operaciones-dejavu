@@ -16,6 +16,7 @@ import {
 import {localDay,atLocalDay,shiftOf,eventStart,eventEnd,myEvents,filteredEvents,payLabel,paymentFilter,netHours,reportFromFinishedClock} from "./staff-dashboard.mjs";
 import {timeStatement,hours,overtimeText} from "./ops-timekeeping.mjs";
 import {receiptData,receiptHtml} from "./ops-receipt.mjs";
+import {downloadReceiptPdf,downloadMonthlyPdf} from "./ops-pdf-download.mjs";
 import {ownMonthReport,monthlyReceiptHtml} from "./ops-monthly-receipt.mjs";
 import {ownBreaks,openBreak,nextBreakSlot,verifiedBreakSummary} from "./ops-breaks.mjs";
 import {eligibleNotices} from "./ops-reminders.mjs";
@@ -324,7 +325,7 @@ function renderPayments(events){
       '<p>'+esc(l.activity||l.notes||"Actividad sin descripción")+'</p>'+
       (l.returnNote?'<p><b>Comentario de coordinación:</b> '+esc(l.returnNote)+'</p>':"")+
       (state==="pagado"?'<p>Coordinación registró el pago como realizado. Este estado no es un comprobante bancario.</p>':"")+
-      (summary?'<button type="button" data-print-report="'+esc(l.id)+'">Ver comprobante / Guardar PDF</button>':'')+
+      (summary?'<button type="button" data-download-report="'+esc(l.id)+'">Descargar PDF para pagos</button><button type="button" data-print-report="'+esc(l.id)+'">Vista imprimible</button>':'')+
       (action?(hasPriorApproved?
         '<p>Este registro contiene una validación anterior y requiere revisión de coordinación para reenviarse.</p>':
         '<button type="button" class="primary" data-request-payment="'+esc(l.id)+'" '+(busy||!canRequest?"disabled":"")+'>Solicitar revisión de horas</button>'):"")+
@@ -391,6 +392,18 @@ async function createReport(eventId,declaredBreakMins=0){
     setTab("pagos");
   },"Creando un reporte de horas basado en tu marcaje oficial…");
 }
+async function downloadMonthPdf(){
+  if(!user||!personId||!staff||!logsLoaded)return;
+  try{
+    const month=$("j-month-report").value.trim();
+    const clocks=new Map((staff.events||[]).map(e=>[e.id,records.get(key(user.uid,e.id))]));
+    const report=ownMonthReport({logs:[...logs.values()],events:staff.events,clocks,
+      uid:user.uid,personId,person:staff.person,month});
+    if(!report.activityCount){status("No hay reportes finalizados para ese mes.","error");return}
+    const filename=await downloadMonthlyPdf(report);
+    status("Resumen PDF descargado: "+filename+". Puedes adjuntarlo a una solicitud, sujeto a revisión.","ok");
+  }catch(error){status("No se pudo descargar el resumen PDF: "+errorMessage(error)+". Usa «Imprimir / Guardar como PDF».","error")}
+}
 function printMonthReport(){
   if(!user||!personId||!staff||!logsLoaded)return;
   const month=$("j-month-report").value;
@@ -411,6 +424,17 @@ function printMonthReport(){
     setTimeout(()=>URL.revokeObjectURL(url),60000);
     status("Se abrió tu resumen del mes. Selecciona «Imprimir / Guardar como PDF» en la nueva pestaña.","ok");
   }catch(error){status("No se pudo generar el resumen: "+errorMessage(error),"error")}
+}
+async function downloadWorkReceipt(id){
+  const record=logs.get(id);
+  if(!record||!user||record.ownerUid!==user.uid||record.personId!==personId)return;
+  const event=(staff?.events||[]).find(e=>e.id===record.eventId);
+  const clock=event?records.get(key(user.uid,event.id)):null;
+  try{
+    status("Generando comprobante PDF local…");
+    const filename=await downloadReceiptPdf(receiptData({log:record,event,clock,person:staff.person,personId}));
+    status("PDF descargado: "+filename+". Puedes adjuntarlo a la solicitud de recursos y pagos; no autoriza pagos.","ok");
+  }catch(error){status("No se descargó el PDF: "+errorMessage(error)+". Usa la vista imprimible.","error")}
 }
 function printWorkReceipt(id){
   const record=logs.get(id);
@@ -741,6 +765,8 @@ $("staff-board").addEventListener("click",event=>{
   }
   const receipt=event.target.closest("[data-print-report]");
   if(receipt){printWorkReceipt(receipt.dataset.printReport);return}
+  const download=event.target.closest("[data-download-report]");
+  if(download){downloadWorkReceipt(download.dataset.downloadReport);return}
   const request=event.target.closest("[data-request-payment]");
   if(request){requestPayment(request.dataset.requestPayment);return}
 });
@@ -759,6 +785,7 @@ $("j-period").addEventListener("change",()=>{
 $("j-pay-filter").addEventListener("change",()=>{payFilter=$("j-pay-filter").value;render()});
 $("j-month-report").value=localDay(Date.now()).slice(0,7);
 $("j-print-month").onclick=printMonthReport;
+$("j-download-month-pdf").onclick=downloadMonthPdf;
 function changeCalendar(direction){
   const base=new Date(atLocalDay(calendarDay));
   if(!Number.isFinite(base.getTime()))return;
