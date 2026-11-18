@@ -80,6 +80,7 @@ try{
    const end=new Date(document.querySelector("#ev-end").value);
    return (end-start)/3600000;
  }),6,"La hora final se calcula automáticamente a partir de la duración");
+ await page.locator("#ev-site-name").fill("Sucursal de prueba sin datos reales");
  await page.locator("#ev-work-mode").selectOption("jornada_campo");
  assert.equal(await page.locator("#ev-work-mode").inputValue(),"jornada_campo");
  // La estimación sin costo funciona con coordenadas sin consultar servicios externos.
