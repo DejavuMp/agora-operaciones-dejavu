@@ -673,7 +673,7 @@ function renderLiveDashboard(){
       '<div><b>'+count('traslado')+'</b><small>En traslado</small></div>'+
       '<div><b>'+count('finalizado')+'</b><small>Jornada terminada</small></div>'+
       '<div><b>'+(count('sin_entrada')+count('sin_cuenta'))+'</b><small>Sin entrada / por vincular</small></div></div>'+
-    '<div class="ops-live-regions">'+(groups.join('')||'<div class="empty"><div class="empty-title">Sin personal asignado hoy</div>'+
+    '<div class="ops-live-regions">'+(groups||'<div class="empty"><div class="empty-title">Sin personal asignado hoy</div>'+
     '<p>Asigna personal a una actividad y aparecerá aquí con su estado operativo. No se trata de seguimiento en segundo plano.</p></div>')+'</div>'+
     '<p class="ops-live-disclaimer">Los estados proceden de marcajes, descansos y traslados. Solo mostramos coordenadas compartidas en los últimos 5 minutos; la app no guarda rutas continuas. Las horas oficiales permanecen en Firestore.</p>'+
     '</section>';

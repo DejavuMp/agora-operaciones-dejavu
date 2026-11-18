@@ -47,14 +47,7 @@ try{
  await context.route("https://www.gstatic.com/firebasejs/13.1.0/firebase-firestore.js",r=>r.fulfill({status:200,headers,body:db}));
  const page=await context.newPage();page.on("pageerror",ex=>errors.push(ex.message));
  await page.goto("http://127.0.0.1:8765/operaciones/",{waitUntil:"domcontentloaded"});
- try{
-   await page.locator("#app [data-nav='calendario']").first().waitFor({state:"visible",timeout:12000});
- }catch(error){
-   console.error("DIAGNOSTICO INICIO:",(await page.locator("body").innerText()).slice(0,1800));
-   console.error("DIAGNOSTICO ERRORES:",JSON.stringify(errors));
-   console.error("DIAGNOSTICO HTML:",(await page.locator("#ops-gate").innerHTML()).slice(0,1200));
-   throw error;
- }
+ await page.locator("#app [data-nav='calendario']").first().waitFor({state:"visible",timeout:12000});
  await page.locator("#app [data-nav='calendario']").first().click();
  await page.locator("#app [data-action='board-view-cronograma']").waitFor({state:"visible",timeout:12000});
  await page.locator("[data-action='board-view-cronograma']").first().click();
