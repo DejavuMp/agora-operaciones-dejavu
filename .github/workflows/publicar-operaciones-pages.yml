@@ -45,6 +45,7 @@ jobs:
           node operaciones/tests/qa-timekeeping-receipt.mjs
           node operaciones/tests/qa-ops-pdf-download.mjs
           node operaciones/tests/qa-ops-status-pdf.mjs
+          node operaciones/tests/qa-paga-assignments.mjs
           node operaciones/tests/qa-region-live.mjs
       - name: Preparar emulador Firestore sin contactar producción
         run: npm install --no-save 'firebase@^12.0.0' '@firebase/rules-unit-testing@^5.0.0' firebase-tools

@@ -71,6 +71,6 @@ export function reportFromFinishedClock({clock,event,uid,personId,id,breakMins=0
     place:String(event.venueName||event.location||"Sede asignada").slice(0,240),
     notes:"Entrada y salida registradas en Firebase. Descanso declarado por el integrante: "+summary.breakMinutes+" min. "+
       (summary.reviewRequired?"Excedente a revisar: "+hours(summary.overtimeCandidateMinutes)+".":"Sin excedente detectado."),
-    paymentBasis:summary.paymentBasis,paymentStatus:"capturado",revision:1
+    paymentBasis:(event.staff||[]).find(a=>a.personId===personId)?.rateUnit||summary.paymentBasis,paymentStatus:"capturado",revision:1
   };
 }

@@ -7,6 +7,7 @@
 import "../firebase-init.js";
 import {projectStaffView} from "./ops-safe-view.mjs";
 import {receiptData} from "./ops-receipt.mjs";
+import {overtimePolicy} from "./ops-paga.mjs";
 import {downloadReceiptPdf} from "./ops-pdf-download.mjs";
 import {availablePeople,personForLink} from "./access-link-model.mjs";
 import {createEventControl} from "./editor-jornadas-control.mjs";
@@ -490,13 +491,14 @@ async function downloadCoordinatorReceipt(id){
   const clock=await getDocFromServer(doc(fs,"agora_ops_clock",ownerUid+"_"+event.id));
   if(!clock.exists()||clock.data()?.status!=="finalizada")
     throw Error("Primero se necesita el marcaje de entrada y salida certificado por Firebase.");
-  const file=await downloadReceiptPdf(receiptData({log,event,clock:clock.data(),person,personId:person.id}));
+  const file=await downloadReceiptPdf(receiptData({log,event:{...event,overtimePolicy:overtimePolicy(board.settings,event.project)},clock:clock.data(),person,personId:person.id}));
   notice("Comprobante descargado: "+file+". Adjunta este PDF en Recursos y Pagos.","ok");
   return file;
 }
 window.AGORA_OPS_BRIDGE={
   get ready(){return ready},get role(){return role},
   get personId(){return personId},
+  get coordinatorName(){return role==='coordinador'?(account?.displayName||account?.email||'Coordinación'):'Coordinación'},
   save:store,
   downloadReceipt:downloadCoordinatorReceipt,
   openJornadasControl:()=>{if(role==="coordinador"&&ready)opsJornadas.open()},
