@@ -19,6 +19,7 @@ assert.deepEqual(attendanceReference({...log,paymentStatus:"validado"}),{
 assert.throws(()=>verifiedAttendance({log,clock:{...clock,status:"en_curso"}}),/entrada y salida/);
 assert.throws(()=>verifiedAttendance({log:{...log,ownerUid:"uid-2"},clock}),/no corresponde/);
 assert.throws(()=>verifiedAttendance({log:{...log,start:"2026-11-18T13:00:00-06:00"},clock}),/no coincide/);
+assert.throws(()=>verifiedAttendance({log:{...log,start:"fecha inválida"},clock}),/no coincide/);
 assert.throws(()=>verifiedAttendance({log:{...log,breakMins:500},clock}),/descanso/);
 assert.throws(()=>verifiedAttendance({log:{...log,breakMins:0,activity:"no"},clock}),/describir/);
 const board={events:[{id:"evt-1",title:"Prueba",project:"Demo",staff:[

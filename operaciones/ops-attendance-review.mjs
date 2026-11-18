@@ -23,7 +23,8 @@ export function verifiedAttendance({log,clock}={}){
   if(!Number.isFinite(start)||!Number.isFinite(end)||end<=start)
     throw Error("Las horas oficiales del servidor son inválidas.");
   const reportedStart=instant(log.start),reportedEnd=instant(log.end);
-  if(Math.abs(reportedStart-start)>1000||Math.abs(reportedEnd-end)>1000)
+  if(!Number.isFinite(reportedStart)||!Number.isFinite(reportedEnd)||
+     Math.abs(reportedStart-start)>1000||Math.abs(reportedEnd-end)>1000)
     throw Error("El reporte fue modificado y no coincide con los marcajes oficiales. Solicita revisión.");
   const gross=elapsedMinutes(clock.startedAt,clock.endedAt);
   const rest=Number(log.breakMins||0);
