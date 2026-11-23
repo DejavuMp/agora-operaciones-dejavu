@@ -1,23 +1,25 @@
 import "../firebase-init.js";
-import {clean,safeUrl,makeRequest,makeQuote,summary,encodeCsv,STATUSES,ROUTES} from "./reparaciones-model.mjs";
+import {clean,safeUrl,makeRequest,makeQuote,summary,encodeCsv,STATUSES,ROUTES,SCOPES,PRIORITIES} from "./reparaciones-model.mjs";
 import {quoteFromInvite} from "./reparaciones-invitaciones-model.mjs";
 import {mountInvitations} from "./reparaciones-invitaciones-ui.mjs";
 import {compressSparkPhoto,photoRefId,photoMarker,sparkPhotoPayload} from "./reparaciones-fotos-spark.mjs";
 import {HCB_PROJECT,HCB_STAND,HCB_CASE,HCB_ASSETS,HCB_INSPECTIONS,hcbAssetById,hcbImportPlan} from "./hot-cruji-bravo-caso.mjs";
 import {importHotCrujiPhotoCase} from "./hot-cruji-bravo-importar.mjs";
 import {groupRepairs,bundleByItem,bundleStatus,bundleSummary,bundledCsv} from "./reparaciones-agrupadas.mjs";
+import {repairEditPatch,repairGroupPatch,checkEditRevision} from "./reparaciones-editar.mjs";
 import {GoogleAuthProvider,onAuthStateChanged,signInWithPopup,signInWithRedirect,signOut} from "https://www.gstatic.com/firebasejs/13.1.0/firebase-auth.js";
 import {collection,doc,query,where,limit,onSnapshot,getDocFromServer,getDocsFromServer,serverTimestamp,writeBatch,runTransaction} from "https://www.gstatic.com/firebasejs/13.1.0/firebase-firestore.js";
 // Plan Spark: fotos comprimidas en documentos privados de Firestore. Sin Storage.
 const fb=window.AGORA_FIREBASE,auth=fb?.auth,db=fb?.firestore;
 const $=id=>document.getElementById(id),esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const COLL="agora_repair_requests",EVENTS="agora_repair_events";
+let editMode="",editConceptRevision=0,editGroupRevisions=new Map();
 let currentUser=null,coordinator=false,rows=[],grouped=[],activeRepairItemId="",ownedRows=[],assignedRows=[],staffMembers=[],assets=[],selected="",selectedAsset="",unsub=null,unsubAssigned=null,unsubMembers=null,unsubEvents=null,unsubAssets=null,unsubInvites=null,session=0;
 function feedback(message,error=false){$("message").textContent=message;$("message").className=error?"error":"ok";}
 function gate(text,canLogin=true){$("workspace").hidden=true;$("gate").hidden=false;$("gateText").textContent=text;$("login").hidden=!canLogin;}
 const requestRef=id=>doc(db,COLL,id),logRef=()=>doc(collection(db,EVENTS));
 const link=id=>{const u=new URL("./reparaciones.html",location.href);u.searchParams.set("solicitud",id);return u.href;};
-function reset(){session++;if(unsub){unsub();unsub=null;}if(unsubEvents){unsubEvents();unsubEvents=null;}if(unsubAssets){unsubAssets();unsubAssets=null;}if(unsubInvites){unsubInvites();unsubInvites=null;}if(unsubAssigned){unsubAssigned();unsubAssigned=null;}if(unsubMembers){unsubMembers();unsubMembers=null;}rows=[];grouped=[];activeRepairItemId="";ownedRows=[];assignedRows=[];staffMembers=[];assets=[];selected="";selectedAsset="";currentUser=null;coordinator=false;$("detail").textContent="";$("records").textContent="";}
+function reset(){session++;if(unsub){unsub();unsub=null;}if(unsubEvents){unsubEvents();unsubEvents=null;}if(unsubAssets){unsubAssets();unsubAssets=null;}if(unsubInvites){unsubInvites();unsubInvites=null;}if(unsubAssigned){unsubAssigned();unsubAssigned=null;}if(unsubMembers){unsubMembers();unsubMembers=null;}rows=[];grouped=[];activeRepairItemId="";editMode="";editConceptRevision=0;editGroupRevisions=new Map();ownedRows=[];assignedRows=[];staffMembers=[];assets=[];selected="";selectedAsset="";currentUser=null;coordinator=false;$("detail").textContent="";$("records").textContent="";}
 async function start(user){
  reset();if(!user){gate("Inicia sesión con tu cuenta vinculada a ÁGORA.");return;}
  if(!user.emailVerified){gate("Verifica tu correo de Google antes de ingresar.",false);return;}
@@ -128,20 +130,21 @@ function refreshRequests(){
  grouped=groupRepairs(rows);
  $("total").textContent="("+grouped.length+")";
  renderList();
- if(selected)renderDetail(selected);
- else if(new URLSearchParams(location.search).get("solicitud"))select(new URLSearchParams(location.search).get("solicitud"));
+ if(selected&&!editMode)renderDetail(selected);
+ else if(!selected&&new URLSearchParams(location.search).get("solicitud"))select(new URLSearchParams(location.search).get("solicitud"));
 }
 function listenMembers(token){
  unsubMembers=onSnapshot(query(collection(db,"agora_ops_members"),limit(300)),s=>{
   if(token!==session)return;
   staffMembers=s.docs.map(x=>({...x.data(),uid:x.id})).filter(x=>x.active&&x.role==="staff")
    .sort((a,b)=>(a.email||"").localeCompare(b.email||""));
-  if(selected)renderDetail(selected);
+  if(selected&&!editMode)renderDetail(selected);
  },e=>feedback("No se pudo cargar el catálogo de personal: "+e.message,true));
 }
 $("filter").oninput=renderList;
 $("statusFilter").onchange=renderList;
 function select(id){
+ editMode="";
  const group=bundleByItem(rows,id);
  selected=group?.id||id;
  activeRepairItemId=id;
