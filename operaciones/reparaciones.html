@@ -55,6 +55,13 @@ hr{border:0;border-top:1px solid var(--line);margin:20px 0}.hide,[hidden]{displa
 .repair-item b{display:block;font-size:12px}
 .repair-item small{display:block;margin-top:4px;color:var(--muted);font-size:11px}
 .repair-section-label{font-size:12px;font-weight:700;margin:12px 0}
+.repair-edit-form{background:#fff8f8;border:1px solid #e8b8ba;border-radius:12px;padding:17px;margin:15px 0;scroll-margin-top:20px}
+.repair-edit-form h3{font-size:16px;margin:0 0 8px;color:#25272b}
+.repair-edit-form label{margin:12px 0}
+.repair-edit-form .actions{padding-top:7px}
+.repair-edit-form [type=submit]{min-width:155px}
+.repair-group-title .actions{margin-top:12px}
+@media(max-width:530px){.repair-edit-form{padding:13px}.repair-group-title .actions button{width:100%}}
 </style></head>
 <body>
 <header><img src="./assets/dejavu-horizontal.png" alt="Dejavú Marketing"><div><strong>ÁGORA · Solicitudes de Reparación</strong><span>Reporta daños · Asigna responsables · Solicita cotizaciones · Da seguimiento</span></div><a href="./" class="button" style="background:transparent;color:#fff">Operaciones</a></header>
@@ -82,7 +89,7 @@ hr{border:0;border-top:1px solid var(--line);margin:20px 0}.hide,[hidden]{displa
 <p class="form-help">Puedes solicitar un arreglo sin registrar inventario. Los datos complementarios se conservan dentro del folio.</p>
 </details>
 <button type="submit" class="red" id="submitRequest">Crear solicitud de reparación</button>
-<p class="form-help">Se creará una solicitud general con todos los arreglos que agregues. Cada concepto conservará evidencia, responsable y seguimiento.</p>
+<p class="form-help">Después de guardarla, utiliza <strong>Editar datos generales</strong> o <strong>Editar este arreglo</strong> en la solicitud. Cada cambio tendrá su registro en el historial.</p>
 </form>
 <details class="request-extra" data-coord hidden><summary>¿Tienes el ZIP de Hot Cruji Bravo? Registrar sus solicitudes con fotografías</summary>
 <p class="form-help">Carga opcional de siete arreglos dentro de una sola solicitud general con 42 fotografías desde el ZIP, sin abrir el inventario. Requiere tu cuenta de coordinación y no duplicará folios existentes.</p>
