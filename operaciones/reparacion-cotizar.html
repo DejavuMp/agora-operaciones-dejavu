@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="es-MX">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow,noarchive">
+<meta name="referrer" content="no-referrer">
+<meta http-equiv="Cache-Control" content="no-store">
+<title>Dejavú Marketing · Cotización de reparación</title>
+<style>
+:root{font:14px Arial,Helvetica,sans-serif;color:#171a1e;background:#f4f5f5;--red:#d32c37;--line:#dedfe1}
+*{box-sizing:border-box}body{margin:0}header{background:#15171b;color:#fff;padding:18px max(18px,calc((100vw - 940px)/2));display:flex;align-items:center;gap:16px}
+header img{width:130px;object-fit:contain}header strong{font-size:17px}header small{display:block;margin-top:5px;color:#b6bbc1}main{max-width:960px;padding:26px 18px 55px;margin:auto}.paper{border:1px solid var(--line);background:#fff;border-radius:15px;padding:24px;margin:0 0 15px}
+h1{font-size:25px;margin:0 0 7px}h2{font-size:17px;margin:0 0 15px}p{line-height:1.6}.muted{font-size:12px;color:#626a71}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:15px}@media(max-width:670px){.grid{grid-template-columns:1fr}header{flex-wrap:wrap}}
+label{font-weight:700;font-size:12px;display:block;margin:13px 0 0}
+input,textarea{font:14px Arial,Helvetica,sans-serif;width:100%;margin-top:6px;display:block;padding:11px 12px;border:1px solid #cfd3d7;border-radius:8px}
+textarea{min-height:105px;resize:vertical}input:focus-visible,textarea:focus-visible,button:focus-visible{outline:3px solid #f7a6aa;outline-offset:2px}
+dl{display:grid;grid-template-columns:112px 1fr;gap:11px;line-height:1.5;overflow-wrap:anywhere}dt{color:#6c7279;font-size:12px}dd{margin:0;font-size:13px}button{background:var(--red);color:#fff;border:0;border-radius:9px;cursor:pointer;padding:13px 22px;font:700 14px Arial}
+button:disabled{opacity:.5;cursor:wait}a{color:#263847}#error{color:#a31b20}.tag{background:#f2f2f2;color:#494f54;padding:6px 10px;display:inline-block;border-radius:20px;font-size:11px}
+footer{color:#7c8085;font-size:11px;margin-top:15px}.warning{border-left:3px solid #d32c37;padding-left:12px;color:#59616a}
+</style></head><body>
+<header><img src="./assets/dejavu-horizontal.png" alt="Dejavú Marketing"><div><strong>Solicitud de cotización</strong><small>ÁGORA · Proveedores externos</small></div></header>
+<main>
+<section class="paper" id="loading"><h1>Consultar solicitud</h1><p id="status" class="muted" role="status">Verificando que el enlace esté vigente.</p><p id="error" role="alert"></p></section>
+<section id="publicWorkspace" hidden>
+<div class="paper"><span class="tag">Solicitud privada por invitación</span><h1 style="margin-top:14px">Cotización de reparación</h1><p class="muted">Esta invitación permite responder únicamente a este trabajo. No requiere registrarse ni entrar a ÁGORA.</p><dl id="detail"></dl><figure id="photoBlock" hidden style="margin:18px 0"><img id="photoPreview" alt="Vista previa de la pieza dañada" style="width:min(360px,100%);border-radius:9px;border:1px solid #ddd"><figcaption class="muted">Fotografía de referencia compartida para esta cotización</figcaption></figure><p id="materials"></p><p class="muted" id="expires"></p></div>
+<section class="paper" id="responseCard"><h2>Enviar propuesta</h2>
+<p class="muted">Indica tu propuesta y costo en pesos mexicanos. Podrás enviarla una sola vez; coordinación revisará las opciones antes de decidir.</p>
+<form id="quoteForm"><div class="grid"><label>Nombre del proveedor o empresa *<input name="provider" maxlength="160" required></label><label>Correo de contacto<input type="email" name="email" maxlength="240" placeholder="nombre@empresa.com"></label></div>
+<div class="grid"><label>Importe total de la propuesta (MXN) *<input name="amount" type="number" min="0" max="99999999" step=".01" required></label><label>Enlace a cotización (opcional, HTTPS)<input name="link" type="url" maxlength="1000" placeholder="https://..."></label></div>
+<label>¿Qué incluye la reparación? *<textarea name="scope" maxlength="500" required placeholder="Trabajo, materiales, alcance y condiciones"></textarea></label>
+<label>Comentarios adicionales<textarea name="note" maxlength="500" placeholder="Tiempo de entrega, garantía, observaciones..."></textarea></label>
+<p class="warning muted">Este formulario no autoriza el trabajo ni confirma una contratación. Recibirás instrucciones directamente del equipo de Dejavú.</p>
+<button id="submit" type="submit">Enviar cotización</button><p id="message" role="status" aria-live="polite"></p>
+</form></section></section>
+<footer>Dejavú Marketing · Este enlace es individual y temporal. No lo compartas con personas ajenas a la cotización.</footer>
+</main>
+<script type="module" src="./reparacion-cotizar.js"></script>
+</body></html>
