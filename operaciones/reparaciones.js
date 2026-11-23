@@ -5,7 +5,7 @@ import {mountInvitations} from "./reparaciones-invitaciones-ui.mjs";
 import {compressSparkPhoto,photoRefId,photoMarker,sparkPhotoPayload} from "./reparaciones-fotos-spark.mjs";
 import {HCB_PROJECT,HCB_STAND,HCB_CASE,HCB_ASSETS,HCB_INSPECTIONS,hcbAssetById,hcbImportPlan} from "./hot-cruji-bravo-caso.mjs";
 import {importHotCrujiPhotoCase} from "./hot-cruji-bravo-importar.mjs";
-import {groupRepairs,bundleByItem,bundleStatus,bundleSummary} from "./reparaciones-agrupadas.mjs";
+import {groupRepairs,bundleByItem,bundleStatus,bundleSummary,bundledCsv} from "./reparaciones-agrupadas.mjs";
 import {GoogleAuthProvider,onAuthStateChanged,signInWithPopup,signInWithRedirect,signOut} from "https://www.gstatic.com/firebasejs/13.1.0/firebase-auth.js";
 import {collection,doc,query,where,limit,onSnapshot,getDocFromServer,getDocsFromServer,serverTimestamp,writeBatch,runTransaction} from "https://www.gstatic.com/firebasejs/13.1.0/firebase-firestore.js";
 // Plan Spark: fotos comprimidas en documentos privados de Firestore. Sin Storage.
@@ -198,7 +198,7 @@ function renderDetail(id){
  const groupTop=group?
   '<section class="repair-group-title"><h2>Solicitud general · '+esc(group.project)+'</h2>'+
   '<p class="muted">Folio general: '+esc(group.id)+' · '+group.items.length+
-   ' arreglos · '+group.open+' pendientes · '+group.done+' terminados</p>'+
+   ' arreglos · '+group.open+' pendientes · '+group.done+' terminados · '+group.items.reduce((sum,item)=>sum+(item.photos?.length||0),0)+' fotografías</p>'+
   '<div class="actions"><button type="button" id="copyGroup">Copiar solicitud completa</button>'+
   '<button type="button" id="newGroupRepair">+ Agregar otro arreglo</button></div>'+
   '<p class="repair-section-label">Conceptos dentro de esta solicitud</p>'+
@@ -404,7 +404,7 @@ function makePng(r){
   c.toBlob(b=>b?blobDownload(b,"agora-solicitud-reparaciones-"+selected.slice(0,8)+".png"):feedback("No se pudo crear PNG.",true),"image/png");
  }catch(e){feedback("Error al crear PNG: "+e.message,true);}
 }
-$("csv").onclick=()=>blobDownload(new Blob([encodeCsv(rows)],{type:"text/csv;charset=utf-8"}),"agora-reparaciones.csv");
+$("csv").onclick=()=>blobDownload(new Blob([bundledCsv(grouped)],{type:"text/csv;charset=utf-8"}),"agora-solicitudes-reparaciones.csv");
 
 /* Catálogo de activos: fotografías persistentes vinculadas a cada pieza, sin duplicar módulos. */
 function listenCatalog(token){
