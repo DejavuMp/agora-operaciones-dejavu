@@ -45,6 +45,15 @@ hr{border:0;border-top:1px solid var(--line);margin:20px 0}.hide,[hidden]{displa
 <button type="submit" class="primary">Agregar al inventario</button>
 </form>
 <div id="inventoryDetail" class="muted"></div>
+<section id="hotCrujiSeed" data-coord hidden aria-labelledby="hotCrujiTitle" style="border-top:1px solid #e4e6e8;margin-top:20px;padding-top:18px">
+ <div class="detail-head">
+  <div><h3 id="hotCrujiTitle" style="font-size:16px;margin:0 0 5px">Hot Cruji Bravo · Expediente inicial</h3>
+   <p class="muted" style="max-width:770px">KFC México · Centro Santa Fe · ficha técnica de octubre 2026. Se registrarán 13 elementos y 5 revisiones iniciales. No son daños confirmados; las 42 fotografías originales siguen pendientes de incorporar.</p></div>
+  <button id="hcbImport" type="button" class="primary">Registrar Hot Cruji Bravo</button>
+ </div>
+ <p id="hcbImportStatus" role="status" aria-live="polite" class="muted">El expediente se guarda en Firestore con la cuenta de coordinación. Los registros ya existentes se conservan.</p>
+ <details style="margin:10px 0"><summary style="cursor:pointer;font-weight:600">Ver las piezas y revisiones preparadas</summary><div id="hcbPreview" class="muted" style="margin-top:10px"></div></details>
+</section>
 </section>
 <div class="grid">
 <section class="panel"><h2>Reportar un arreglo</h2>
