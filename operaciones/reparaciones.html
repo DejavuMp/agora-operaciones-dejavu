@@ -51,7 +51,15 @@ hr{border:0;border-top:1px solid var(--line);margin:20px 0}.hide,[hidden]{displa
    <p class="muted" style="max-width:770px">KFC México · Centro Santa Fe · ficha técnica de octubre 2026. Se registrarán 13 elementos y 5 revisiones iniciales. No son daños confirmados; las 42 fotografías originales siguen pendientes de incorporar.</p></div>
   <button id="hcbImport" type="button" class="primary">Registrar Hot Cruji Bravo</button>
  </div>
- <p id="hcbImportStatus" role="status" aria-live="polite" class="muted">El expediente se guarda en Firestore con la cuenta de coordinación. Los registros ya existentes se conservan.</p>
+  <p id="hcbImportStatus" role="status" aria-live="polite" class="muted">El expediente se guarda en Firestore con la cuenta de coordinación. Los registros ya existentes se conservan.</p>
+ <section style="border-top:1px dashed #d8dade;margin-top:12px;padding-top:14px">
+  <p style="margin:0 0 8px"><strong>Solicitudes fotográficas · 42 evidencias originales</strong></p>
+  <p class="muted" style="margin:0 0 10px">Preparamos siete solicitudes y dos nuevas piezas a partir de las fotografías reales. Selecciona el ZIP original de WhatsApp para registrar cada foto comprimida directamente en Firestore privado. Los archivos originales nunca se publican en GitHub Pages. Sin facturación.</p>
+  <input id="hcbZipInput" type="file" accept=".zip,application/zip,application/x-zip-compressed" hidden aria-label="Seleccionar ZIP de las 42 fotografías">
+  <button type="button" id="hcbPhotoImport" class="primary">Registrar las solicitudes y sus 42 fotos</button>
+  <p id="hcbPhotoProgress" class="muted" role="status" aria-live="polite">Pendiente de seleccionar el ZIP original.</p>
+  <div id="hcbPhotoLinks" class="actions" aria-label="Folios de reparaciones importadas"></div>
+ </section>
  <details style="margin:10px 0"><summary style="cursor:pointer;font-weight:600">Ver las piezas y revisiones preparadas</summary><div id="hcbPreview" class="muted" style="margin-top:10px"></div></details>
 </section>
 </section>
