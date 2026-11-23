@@ -261,7 +261,8 @@ function renderDetail(id){
   $("progressForm").onsubmit=e=>{e.preventDefault();saveProgress(r,e.target);};
   loadHistory(r);return;
  }
- unsubInvites=mountInvitations($("supplierInvites"),{db,request:r,user:currentUser,notice:feedback,alreadyImported:token=>(r.quotes||[]).some(q=>q.sourceInviteId===token),importProposal:invite=>importExternalQuote(r,invite)});
+ const allScope=group&&group.items.length>1?{...r,area:"Solicitud integral · "+group.items.length+" arreglos",problem:group.items.map((item,i)=>(i+1)+". "+item.area+": "+item.problem).join("\n").slice(0,2000)}:r;
+ unsubInvites=mountInvitations($("supplierInvites"),{db,request:allScope,user:currentUser,notice:feedback,alreadyImported:token=>(r.quotes||[]).some(q=>q.sourceInviteId===token),importProposal:invite=>importExternalQuote(r,invite)});
  $("decisionForm").onsubmit=e=>{e.preventDefault();const f=Object.fromEntries(new FormData(e.target).entries());saveDecision(r,f);};
  $("quoteForm").onsubmit=e=>{e.preventDefault();addQuote(r,Object.fromEntries(new FormData(e.target).entries()));};
  document.querySelectorAll("[data-pick]").forEach(b=>b.onclick=()=>chooseQuote(r,b.dataset.pick));
@@ -400,7 +401,7 @@ function makePng(r){
   x.fillStyle="#202329";x.font="bold 29px Arial";x.fillText("ÁGORA · REPARACIONES",pad,75);x.font="23px Arial";
   lines.forEach((line,i)=>x.fillText(line,pad,124+i*34));
   const qr=qrCanvas();if(qr)x.drawImage(qr,pad,height-135,110,110);
-  c.toBlob(b=>b?blobDownload(b,"agora-reparacion-"+r.id.slice(0,8)+".png"):feedback("No se pudo crear PNG.",true),"image/png");
+  c.toBlob(b=>b?blobDownload(b,"agora-solicitud-reparaciones-"+selected.slice(0,8)+".png"):feedback("No se pudo crear PNG.",true),"image/png");
  }catch(e){feedback("Error al crear PNG: "+e.message,true);}
 }
 $("csv").onclick=()=>blobDownload(new Blob([encodeCsv(rows)],{type:"text/csv;charset=utf-8"}),"agora-reparaciones.csv");
