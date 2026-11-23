@@ -241,7 +241,7 @@ function beginRepairEdit(mode,group,r){
 async function saveConceptEdit(r,formEl){
  if(!coordinator||!currentUser)throw Error("Solo coordinación puede editar esta solicitud.");
  const patch=repairEditPatch(Object.fromEntries(new FormData(formEl).entries()));
- await update(r.id,"edición de arreglo","Datos del concepto "+r.area+" corregidos",old=>{
+ await update(r.id,"decisión","Edición de concepto: "+r.area,old=>{
   checkEditRevision(old,editConceptRevision);
   return patch;
  });
@@ -269,7 +269,7 @@ async function saveGroupEdit(group,formEl){
    const item=group.items[i],old=snaps[i].data();
    tx.update(refs[i],{...patch,revision:old.revision+1,updatedAt:serverTimestamp()});
    tx.set(logRef(),{requestId:item.id,actorUid:currentUser.uid,actorEmail:currentUser.email,
-    action:"edición general",detail:"Proyecto/stand actualizados: "+patch.project+" / "+patch.asset,
+    action:"decisión",detail:"Edición general: "+patch.project+" / "+patch.asset,
     createdAt:serverTimestamp()});
   }
  });
