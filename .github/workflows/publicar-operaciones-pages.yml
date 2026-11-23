@@ -55,6 +55,8 @@ jobs:
         run: npx firebase emulators:exec --only firestore --project demo-agora-jornadas --non-interactive 'node .github/firebase-staff/test-clock-rules.mjs'
       - name: Verificar creación completa de Hot Cruji Bravo sin acceder a producción
         run: npx firebase emulators:exec --only firestore --project demo-agora-ops --non-interactive 'node operaciones/tests/qa-hcb-firestore.mjs'
+      - name: Verificar edición de solicitud y folios con seguridad Firestore
+        run: npx firebase emulators:exec --only firestore --project demo-agora-ops --non-interactive 'node operaciones/tests/qa-reparaciones-editar-firestore.mjs'
 
   publish:
     name: "Publicar sitio independiente solo después de pruebas"
