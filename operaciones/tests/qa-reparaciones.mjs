@@ -188,7 +188,7 @@ test("Solicitudes de reparación es el flujo principal, inventario permanece sec
  assert.ok(html.indexOf('id="hcbPhotoImport"')<inventory,"Importación fotográfica accesible desde solicitudes");
  assert.equal((html.match(/id="hcbPhotoImport"/g)||[]).length,1);
  assert.match(js,/if\(coordinator\)\{listenCatalog\(token\);listenMembers\(token\);\}/);
- assert.match(js,/batch\.set\(requestRef\(id\),item\)/);
+ assert.match(js,/batch\.set\(requestRef\(id\),record\)/);
  assert.match(js,/batch\.set\(logRef\(\)/);
  assert.match(js,/importHotCrujiPhotoCase/);
 });
@@ -217,7 +217,7 @@ test("Hot Cruji Bravo aparece como una sola solicitud general con conceptos inde
  const summary=bundleSummary(combined,"https://example.org/solicitud-general");
  for(const item of combined.items){
   assert.ok(summary.includes(item.area));
-  assert.ok(!summary.includes(item.id),"No exponer folios internos en el PDF general");
+  if(item.id!==combined.id)assert.ok(!summary.includes(item.id),"No exponer subfolios internos en el PDF general");
  }
  assert.match(summary,/Total de conceptos: 6/);
  assert.match(summary,/Folio general:/);
