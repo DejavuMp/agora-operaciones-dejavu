@@ -131,7 +131,11 @@ function renderDetail(id){
  <div class="actions"><button id="copy">Copiar ficha</button><button id="email">Correo</button><button id="whatsapp">WhatsApp</button><button id="pdf">PDF</button><button id="png">Imagen PNG</button><button id="copyLink">Copiar enlace</button></div>
  <div class="two" style="align-items:start"><div><h3 style="font-size:14px">Enlace y QR privado</h3><div id="qr"></div><p class="form-help">Requiere una cuenta con permisos para abrir el expediente. No compartir con acceso anónimo.</p></div>
  <div><h3 style="font-size:14px">Evidencias</h3><div id="photos" class="photos"></div><label>Adjuntar fotografías JPEG/PNG<input id="photoFiles" type="file" multiple accept="image/*"></label><label>Tipo de evidencia<select id="photoStage"><option value="antes">Antes</option><option value="avance">Durante</option><option value="despues">Después</option></select></label><button id="uploadPhotos">Guardar fotografías</button><p class="form-help">Máximo 12 evidencias por folio, 5 MB por imagen guardada.</p></div></div>
- <hr><h3 style="font-size:15px">Cotizaciones</h3>${quotes}
+ ${!coordinator?`<hr><h3 style="font-size:15px">Registrar avance del arreglo</h3>
+ <form id="progressForm"><label>¿Qué se hizo o qué falta?<textarea name="detail" minlength="3" maxlength="500" required placeholder="Ej. Se reparó la estructura y se anexaron fotos del resultado"></textarea></label>
+ <button type="submit" class="primary">Guardar avance</button></form>
+ <h3 style="font-size:14px">Mis movimientos</h3><ul id="history"><li>Cargando...</li></ul>`:""}
+ <hr><h3 style="font-size:15px">Cotizaciones</h3>${coordinator?quotes:'<p class="muted">Las cotizaciones y los importes los revisa coordinación.</p>'}
  ${coordinator?`<section id="supplierInvites" style="margin-top:20px"></section><hr>`:""}
  ${coordinator?`<form id="quoteForm"><h3 style="font-size:13px">Agregar cotización</h3><div class="two"><label>Proveedor<input name="provider" maxlength="160" required></label><label>Importe MXN<input type="number" min="0" max="99999999" step=".01" name="amount" required></label></div><label>Alcance / trabajo<input name="scope" maxlength="500"></label><label>Enlace HTTPS de cotización<input name="link" type="url"></label><label>Observaciones<input name="note" maxlength="500"></label><button type="submit">Guardar propuesta</button></form>
  <hr><form id="decisionForm"><h3 style="font-size:15px">Decisión de coordinación</h3>
@@ -173,6 +177,19 @@ async function update(id,action,detail,mutate){
   tx.update(requestRef(id),{...data,revision:old.revision+1,updatedAt:serverTimestamp()});
   tx.set(logRef(),{requestId:id,actorUid:currentUser.uid,actorEmail:currentUser.email,action,detail:clean(detail,500),createdAt:serverTimestamp()});
  });
+}
+async function saveProgress(r,form){
+ if(!currentUser||coordinator)return feedback("Acceso no autorizado.",true);
+ const detail=clean(form.elements.detail.value,500);
+ if(detail.length<3)return feedback("Describe el avance realizado.",true);
+ const button=form.querySelector("[type=submit]");button.disabled=true;
+ try{
+  const batch=writeBatch(db);
+  batch.set(logRef(),{requestId:r.id,actorUid:currentUser.uid,
+   actorEmail:currentUser.email,action:"avance",detail,createdAt:serverTimestamp()});
+  await batch.commit();form.reset();feedback("Avance guardado y disponible para coordinación.");
+ }catch(e){feedback("No se guardó el avance: "+e.message,true)}
+ finally{button.disabled=false}
 }
 async function saveDecision(r,f){
  try{
