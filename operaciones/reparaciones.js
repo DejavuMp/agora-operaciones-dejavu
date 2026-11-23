@@ -191,12 +191,28 @@ async function renderPhotos(record){
 }
 function renderDetail(id){
  if(unsubInvites){unsubInvites();unsubInvites=null;}
- const r=rows.find(x=>x.id===id);if(!r){$("detail").innerHTML='<p class="muted">El folio todavía no se encuentra en tus solicitudes o no tienes permiso para verlo.</p>';return;}
+ const group=bundleByItem(rows,id);
+ const r=group?.items.find(x=>x.id===activeRepairItemId)||group?.items[0]||rows.find(x=>x.id===id);
+ if(!r){$("detail").innerHTML='<p class="muted">La solicitud no está disponible para tu cuenta o aún se está cargando.</p>';return;}
+ activeRepairItemId=r.id;
+ const groupTop=group?
+  '<section class="repair-group-title"><h2>Solicitud general · '+esc(group.project)+'</h2>'+
+  '<p class="muted">Folio general: '+esc(group.id)+' · '+group.items.length+
+   ' arreglos · '+group.open+' pendientes · '+group.done+' terminados</p>'+
+  '<div class="actions"><button type="button" id="copyGroup">Copiar solicitud completa</button>'+
+  '<button type="button" id="newGroupRepair">+ Agregar otro arreglo</button></div>'+
+  '<p class="repair-section-label">Conceptos dentro de esta solicitud</p>'+
+  '<div class="repair-items">'+group.items.map((item,i)=>
+    '<button type="button" class="repair-item '+(item.id===r.id?'selected':'')+
+    '" data-repair-item="'+esc(item.id)+'"><span><b>'+(i+1)+'. '+esc(item.area)+
+    '</b><small>'+esc(item.status)+' · '+(item.photos?.length||0)+
+    ' fotos · '+esc(item.assignedTo||'Por asignar')+'</small></span><span aria-hidden="true">›</span></button>'
+   ).join('')+'</div></section>':"";
  const quotes=(r.quotes||[]).map(q=>`<div class="quote ${q.id===r.selectedQuoteId?"selected":""}"><strong>${esc(q.provider)} · $${Number(q.amount).toFixed(2)} MXN</strong>
  <p>${esc(q.scope||"Sin alcance")} · ${esc(q.note||"")}</p>
  ${safeUrl(q.link)?`<a href="${esc(safeUrl(q.link))}" rel="noopener noreferrer" target="_blank">Ver cotización</a>`:""}
  ${coordinator?`<button data-pick="${esc(q.id)}" type="button">${q.id===r.selectedQuoteId?"Seleccionada":"Elegir cotización"}</button>`:""}</div>`).join("")||'<p class="muted">Aún no hay cotizaciones registradas.</p>';
- $("detail").innerHTML=`<div class="detail-head"><div><h2>${esc(r.asset)} · ${esc(r.area)}</h2><p class="muted">Folio completo: ${esc(r.id)}</p></div><span class="status">${esc(r.status)}</span></div>
+ $("detail").innerHTML=groupTop+`<div class="detail-head"><div><h2>Arreglo: ${esc(r.area)}</h2><p class="muted">Folio completo: ${esc(r.id)}</p></div><span class="status">${esc(r.status)}</span></div>
  <dl>${detailRow("Proyecto",r.project)}${detailRow("Problema",r.problem)}${detailRow("Motivo",r.cause)}${detailRow("Instrucciones",r.solutionMode==="propuesta"?"Solicitar propuesta":r.instructions)}
  ${detailRow("Requerido",r.dueDate)}${detailRow("Prioridad",r.priority)}${detailRow("Reportó",r.createdByName)}
  ${detailRow("Ruta",r.repairRoute)}${detailRow("Responsable",r.assignedTo)}${detailRow("Coordinación",r.decisionBy)}${detailRow("Notas",r.decisionNote)}</dl>
@@ -224,10 +240,20 @@ function renderDetail(id){
  <button type="submit" class="primary">Guardar decisión y seguimiento</button></form>
  <hr><h3 style="font-size:14px">Historial de movimientos</h3><ul id="history"><li>Cargando historial...</li></ul>`:""}`;
  qr();renderPhotos(r);
- $("copy").onclick=()=>copy(summary(r,link(r.id)));
- $("copyLink").onclick=()=>copy(link(r.id));
- $("email").onclick=()=>{location.href="mailto:?subject="+encodeURIComponent("ÁGORA · Reparación "+r.asset+" · "+r.id.slice(0,8))+"&body="+encodeURIComponent(summary(r,link(r.id)).slice(0,4500));};
- $("whatsapp").onclick=()=>window.open("https://wa.me/?text="+encodeURIComponent(summary(r,link(r.id)).slice(0,3500)),"_blank","noopener,noreferrer");
+ document.querySelectorAll("[data-repair-item]").forEach(b=>b.onclick=()=>{
+  activeRepairItemId=b.dataset.repairItem;renderDetail(selected);
+ });
+ if($("copyGroup"))$("copyGroup").onclick=()=>copy(bundleSummary(group,link(group.id)));
+ if($("newGroupRepair"))$("newGroupRepair").onclick=()=>{
+  form.elements.project.value=group.project;form.elements.asset.value=group.asset;
+  form.elements.area.value="";form.elements.problem.value="";
+  $("newRepair").scrollIntoView({behavior:"smooth",block:"start"});
+  form.elements.area.focus();
+ };
+ $("copy").onclick=()=>copy(bundleSummary(group||bundleByItem(rows,r.id),link(selected)));
+ $("copyLink").onclick=()=>copy(link(selected));
+ $("email").onclick=()=>{location.href="mailto:?subject="+encodeURIComponent("ÁGORA · Solicitud general "+r.project+" · "+selected.slice(0,8))+"&body="+encodeURIComponent(bundleSummary(group,link(selected)).slice(0,4500));};
+ $("whatsapp").onclick=()=>window.open("https://wa.me/?text="+encodeURIComponent(bundleSummary(group,link(selected)).slice(0,3500)),"_blank","noopener,noreferrer");
  $("pdf").onclick=()=>makePdf(r);
  $("png").onclick=()=>makePng(r);
  $("uploadPhotos").onclick=()=>uploadPhotos(r);
@@ -350,22 +376,22 @@ function blobDownload(blob,file){const url=URL.createObjectURL(blob),a=document.
 function qrCanvas(){return $("qr")?.querySelector("canvas")||null;}
 function makePdf(r){
  const lib=window.jspdf?.jsPDF;if(!lib){feedback("No se cargó el generador PDF; usa Imprimir del navegador.",true);window.print();return;}
- try{const p=new lib({unit:"mm",format:"a4"}),txt=summary(r,link(r.id)),lines=p.splitTextToSize(txt,175);let y=22;
+ try{const group=bundleByItem(rows,r.id),p=new lib({unit:"mm",format:"a4"}),txt=bundleSummary(group,link(selected)),lines=p.splitTextToSize(txt,175);let y=22;
  p.setFontSize(13);p.setFont("helvetica","bold");p.text("DEJAVÚ · SOLICITUD DE REPARACIÓN",18,y);p.setFont("helvetica","normal");p.setFontSize(9);y+=12;
  for(const line of lines){if(y>270){p.addPage();y=20;}p.text(line,18,y);y+=5;}
  if(y>220){p.addPage();y=20;}
  p.setFillColor(24,27,32);p.roundedRect(18,y+3,92,11,2,2,"F");
  p.setTextColor(255,255,255);p.setFontSize(10);
- p.textWithLink("ABRIR SOLICITUD PRIVADA",22,y+10,{url:link(r.id)});
+ p.textWithLink("ABRIR SOLICITUD GENERAL",22,y+10,{url:link(selected)});
  p.setTextColor(32,35,40);
  const qr=qrCanvas();if(qr)p.addImage(qr.toDataURL("image/png"),"PNG",18,y+18,29,29);
- p.save("agora-reparacion-"+r.id.slice(0,8)+".pdf");
+ p.save("agora-solicitud-reparaciones-"+selected.slice(0,8)+".pdf");
  }catch(e){feedback("No se pudo generar PDF: "+e.message,true);}
 }
 function makePng(r){
  try{
   const lines=[],w=1100,pad=48;const tmp=document.createElement("canvas").getContext("2d");tmp.font="23px Arial";
-  for(const text of summary(r,link(r.id)).split("\n")){let line="";
+  for(const text of bundleSummary(bundleByItem(rows,r.id),link(selected)).split("\n")){let line="";
    for(const word of text.split(" ")){const test=line?line+" "+word:word;if(line&&tmp.measureText(test).width>w-2*pad){lines.push(line);line=word;}else line=test;}
    lines.push(line);
   }
