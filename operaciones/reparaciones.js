@@ -4,6 +4,7 @@ import {quoteFromInvite} from "./reparaciones-invitaciones-model.mjs";
 import {mountInvitations} from "./reparaciones-invitaciones-ui.mjs";
 import {compressSparkPhoto,photoRefId,photoMarker,sparkPhotoPayload} from "./reparaciones-fotos-spark.mjs";
 import {HCB_PROJECT,HCB_STAND,HCB_CASE,HCB_ASSETS,HCB_INSPECTIONS,hcbAssetById,hcbImportPlan} from "./hot-cruji-bravo-caso.mjs";
+import {importHotCrujiPhotoCase} from "./hot-cruji-bravo-importar.mjs";
 import {GoogleAuthProvider,onAuthStateChanged,signInWithPopup,signInWithRedirect,signOut} from "https://www.gstatic.com/firebasejs/13.1.0/firebase-auth.js";
 import {collection,doc,query,where,limit,onSnapshot,getDocFromServer,getDocsFromServer,serverTimestamp,writeBatch,runTransaction} from "https://www.gstatic.com/firebasejs/13.1.0/firebase-firestore.js";
 // Plan Spark: fotos comprimidas en documentos privados de Firestore. Sin Storage.
@@ -423,6 +424,48 @@ async function registerHotCrujiCase(){
   " piezas nuevas y "+inspections.length+" inspecciones nuevas. No se duplicaron piezas existentes. Fotografías originales: 0 de 42 cargadas.";
  feedback("Hot Cruji Bravo preparado en Firestore. Revisa cada pieza y adjunta evidencia real.");
 }
+$("hcbPhotoImport").onclick=()=>{
+ if(!coordinator||!currentUser){feedback("Solo coordinación puede registrar estas solicitudes.",true);return;}
+ $("hcbZipInput").click();
+};
+$("hcbZipInput").onchange=async()=>{
+ const file=$("hcbZipInput").files?.[0];
+ if(!file)return;
+ const button=$("hcbPhotoImport"),baseButton=$("hcbImport");
+ button.disabled=true;baseButton.disabled=true;
+ $("hcbPhotoLinks").replaceChildren();
+ const progress=$("hcbPhotoProgress");
+ try{
+  const report=await importHotCrujiPhotoCase({
+   db,user:currentUser,zipFile:file,
+   registerBase:()=>registerHotCrujiCase(),
+   progress:message=>{progress.textContent=message;}
+  });
+  progress.textContent="Guardado verificado: "+report.total+
+   " fotos asociadas ("+report.created+" nuevas, "+report.existing+
+   " existentes), siete reportes y "+report.assetCount+" piezas de inventario.";
+  const title=document.createElement("p");
+  title.textContent="Folios privados creados o conservados:";
+  $("hcbPhotoLinks").append(title);
+  for(const item of report.requests){
+   const a=document.createElement("a");
+   a.href=link(item.id);a.target="_blank";a.rel="noopener noreferrer";
+   a.textContent=item.code+" · "+item.area+" ("+item.photos+" fotos)";
+   $("hcbPhotoLinks").append(a);
+  }
+  $("filter").value=HCB_PROJECT;
+  $("statusFilter").value="";
+  renderList();$("assetSearch").value=HCB_PROJECT;renderCatalog();
+  feedback("Hot Cruji Bravo registrado con sus solicitudes y fotografías privadas.");
+ }catch(error){
+  progress.textContent="La carga no concluyó: "+(error?.message||error)+
+   ". Puedes seleccionar de nuevo el mismo ZIP: se omiten los documentos ya guardados.";
+  feedback("No se completaron todas las evidencias de Hot Cruji Bravo.",true);
+ }finally{
+  $("hcbZipInput").value="";button.disabled=false;baseButton.disabled=false;
+ }
+};
+
 $("hcbImport").onclick=async()=>{
  const button=$("hcbImport");
  button.disabled=true;
