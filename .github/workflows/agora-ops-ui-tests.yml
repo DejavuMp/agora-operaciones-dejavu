@@ -54,10 +54,19 @@ jobs:
         run: |
           node --check operaciones/reparaciones.js
           node --check operaciones/reparaciones-model.mjs
+          node --check operaciones/reparaciones-editar.mjs
           node --test operaciones/tests/qa-reparaciones.mjs
           node --check operaciones/hot-cruji-bravo-importar.mjs
           node --check operaciones/hot-cruji-bravo-zip.mjs
           node --test operaciones/tests/qa-hcb-fotos.mjs
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: Preparar pruebas de edición de reparaciones con Firebase emulado
+        run: npm install --no-save 'firebase@^12.0.0' '@firebase/rules-unit-testing@^5.0.0' firebase-tools
+      - name: Verificar que coordinación edita y staff no sobrescribe solicitudes
+        run: npx firebase emulators:exec --only firestore --project demo-agora-ops --non-interactive 'node operaciones/tests/qa-reparaciones-editar-firestore.mjs'
       - name: Validar app instalable y caché privada
         run: node operaciones/tests/qa-ops-pwa.mjs
       - name: Validar ventanas, geolocalización y traslados
