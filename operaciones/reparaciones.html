@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="es-MX"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="robots" content="noindex,nofollow"><title>ÁGORA · Inventario y reparaciones</title>
+<meta name="robots" content="noindex,nofollow"><title>ÁGORA · Solicitudes de Reparación</title>
 <style>
 :root{color-scheme:light;font:14px Arial,Helvetica,sans-serif;--ink:#1b1e22;--line:#e4e6e8;--muted:#68717b;--brand:#d72b35;--bg:#f5f6f6}
 *{box-sizing:border-box}body{background:var(--bg);margin:0;color:var(--ink)}a{color:#272c32}
@@ -26,14 +26,55 @@ hr{border:0;border-top:1px solid var(--line);margin:20px 0}.hide,[hidden]{displa
 #message{margin-top:11px;min-height:20px}#message.error{color:#a20f18}#message.ok{color:#18613b}
 #qr img,#qr canvas{display:block;width:128px;height:128px;margin:10px 0}
 #history{margin:12px 0 0;padding-left:18px;font-size:12px;line-height:1.8}footer{font-size:11px;color:var(--muted);padding:10px 0}
+
+/* Solicitudes primero. El inventario permanece disponible pero fuera del flujo principal. */
+.request-overview{background:#fff;border:1px solid var(--line);border-radius:13px;padding:20px;margin-bottom:15px}
+.request-overview h1{font-size:21px;margin:0 0 6px}
+.request-overview p{margin:0;color:var(--muted);font-size:13px;line-height:1.5}
+.steps-inline{display:flex;flex-wrap:wrap;gap:7px;margin-top:14px}
+.steps-inline span{background:#f3f4f4;border-radius:7px;padding:7px 10px;font-size:12px}
+#repairMain{scroll-margin-top:14px}
+#inventoryAdvanced{margin-top:16px;padding:16px 20px}
+#inventoryAdvanced>summary{cursor:pointer;font-weight:700;color:#555e66;font-size:13px;list-style-position:inside}
+#inventoryAdvanced>summary:focus-visible{outline:3px solid #fd9ba1;outline-offset:4px}
+#inventoryAdvanced .inventory-body{margin-top:20px;border-top:1px solid var(--line);padding-top:12px}
+.request-extra{margin:12px 0;border:1px solid #e2e5e6;border-radius:9px;padding:12px 13px}
+.request-extra>summary{cursor:pointer;font-size:12px;font-weight:700;color:#343940}
+.request-extra>p{margin:8px 0 0}
+.record:focus-visible{outline:3px solid #fd9ba1;outline-offset:2px}
+@media(max-width:530px){.request-overview{padding:16px}.steps-inline{gap:5px}.steps-inline span{font-size:11px}}
 </style></head>
 <body>
-<header><img src="./assets/dejavu-horizontal.png" alt="Dejavú Marketing"><div><strong>ÁGORA · Inventario y reparaciones</strong><span>Solicitudes de arreglos · Stands, muebles y piezas</span></div><a href="./" class="button" style="background:transparent;color:#fff">Operaciones</a></header>
+<header><img src="./assets/dejavu-horizontal.png" alt="Dejavú Marketing"><div><strong>ÁGORA · Solicitudes de Reparación</strong><span>Reporta daños · Asigna responsables · Solicita cotizaciones · Da seguimiento</span></div><a href="./" class="button" style="background:transparent;color:#fff">Operaciones</a></header>
 <main>
 <section id="gate" class="panel"><h1>Solicitudes de reparación</h1><p id="gateText" class="muted">Verificando acceso seguro a ÁGORA.</p><button id="login" class="primary" hidden>Ingresar con Google</button></section>
 <section id="workspace" hidden>
 <div class="notice"><b id="who"></b><div class="muted">Los reportes y sus fotografías se guardan en Firebase. Solo coordinación y las personas autorizadas pueden consultarlos. Un enlace o QR no evita el inicio de sesión.</div><div class="actions"><button id="logout">Cerrar sesión</button><button id="csv" data-coord hidden>Exportar lista CSV</button></div></div>
-<section class="panel" style="margin-bottom:15px">
+<div class="request-overview"><h1>Solicitudes de reparación</h1><p>Desde aquí puedes crear, revisar y resolver arreglos de stands, muebles, materiales y equipo. El inventario no es requisito.</p><div class="steps-inline" aria-label="Flujo de reparación"><span>1 · Reportar el daño</span><span>2 · Adjuntar evidencias</span><span>3 · Asignar o cotizar</span><span>4 · Seguimiento y entrega</span></div></div>
+<div class="grid" id="repairMain">
+<section class="panel" id="newRepair"><h2>Nueva solicitud de reparación</h2><p class="muted">Describe el arreglo para generar un folio. No necesitas crear una pieza en Inventario.</p>
+<form id="requestForm">
+<div class="two"><label>Proyecto / activación *<input name="project" maxlength="120" placeholder="Hot Cruji Bravo" required></label><label>Stand / mueble *<input name="asset" maxlength="120" placeholder="Stand principal" required></label></div>
+<div class="two"><label>¿Qué se dañó?<select name="scope"><option>Elemento específico</option><option>Área del stand</option><option>Stand completo</option><option>Mueble suelto</option></select></label><label>Pieza o área *<input name="area" maxlength="120" placeholder="Mostrador frontal" required></label></div>
+<label>Problema / arreglo requerido *<textarea name="problem" required maxlength="2000" placeholder="Describe qué sucede y qué necesita atención"></textarea></label>
+<div class="two"><label>Prioridad<select name="priority"><option>Normal</option><option>Alta</option><option>Urgente</option></select></label><label>¿Para cuándo se requiere?<input name="dueDate" type="date"></label></div>
+<details class="request-extra"><summary>Agregar instrucciones, causa, materiales o vínculo con inventario (opcional)</summary>
+<label>Motivo o causa del daño<input name="cause" maxlength="250" placeholder="Montaje, traslado, desgaste..."></label>
+<label>Tipo de solución<select name="solutionMode"><option value="instrucciones">Se conoce el trabajo a realizar</option><option value="propuesta">Necesitamos propuesta de solución</option></select></label>
+<label>Instrucciones o detalles<textarea name="instructions" maxlength="2000"></textarea></label>
+<label>Planos, artes, materiales (HTTPS)<input name="materialLink" type="url" placeholder="https://..."></label>
+<label data-coord hidden>Vincular con pieza existente (opcional)<select id="assetPicker" name="assetId" form="requestForm"><option value="">Sin vincular al inventario</option></select></label>
+<p class="form-help">Puedes solicitar un arreglo sin registrar inventario. Los datos complementarios se conservan dentro del folio.</p>
+</details>
+<button type="submit" class="red" id="submitRequest">Crear solicitud de reparación</button>
+<p class="form-help">Se generará un folio y podrás adjuntar fotos, asignar la reparación, solicitar cotizaciones y compartir el expediente.</p>
+</form></section>
+<section class="panel" id="repairQueue"><div class="detail-head"><h2>Seguimiento de solicitudes <span id="total" class="muted"></span></h2><div class="actions" style="margin:0"><input id="filter" type="search" placeholder="Buscar por folio, proyecto o pieza" aria-label="Buscar solicitudes" style="max-width:265px;margin:0"><select id="statusFilter" aria-label="Filtrar por estado" style="max-width:170px;margin:0"><option value="">Todos los estados</option><option value="pendiente">Pendiente</option><option value="revision">En revisión</option><option value="cotizando">Cotizando</option><option value="autorizado">Autorizado</option><option value="reparacion">En reparación</option><option value="terminado">Terminado</option><option value="entregado">Entregado</option></select></div></div>
+<div id="repairMetrics" class="muted" style="margin-bottom:15px"></div>
+<div id="records"></div><hr><div id="detail"><p class="muted">Selecciona una solicitud para ver su estado, fotos y seguimiento.</p></div></section>
+</div>
+<details id="inventoryAdvanced" class="panel" data-coord hidden><summary>Inventario y archivo de piezas · Opcional, fuera del flujo de solicitudes</summary>
+<div class="inventory-body">
 <div class="detail-head"><div><h2 style="margin-bottom:6px">Inventario de stands y piezas <span id="assetTotal" class="muted"></span></h2><p class="muted">Cada pieza se registra una sola vez; sus fotografías y solicitudes quedan vinculadas.</p></div></div>
 <label style="max-width:420px">Buscar pieza en inventario<input id="assetSearch" type="search" placeholder="Proyecto, stand o pieza"></label>
 <div id="assetCards" class="actions" style="align-items:stretch;max-height:240px;overflow-y:auto"><span class="muted">Cargando catálogo…</span></div>
@@ -62,26 +103,8 @@ hr{border:0;border-top:1px solid var(--line);margin:20px 0}.hide,[hidden]{displa
  </section>
  <details style="margin:10px 0"><summary style="cursor:pointer;font-weight:600">Ver las piezas y revisiones preparadas</summary><div id="hcbPreview" class="muted" style="margin-top:10px"></div></details>
 </section>
-</section>
-<div class="grid">
-<section class="panel"><h2>Reportar un arreglo</h2>
-<label>Pieza del inventario (opcional)<select id="assetPicker" name="assetId" form="requestForm"><option value="">Seleccionar / reportar sin catálogo</option></select></label>
-<form id="requestForm">
-<div class="two"><label>Proyecto / activación *<input name="project" maxlength="120" placeholder="Hot Cruji Bravo" required></label><label>Stand / mueble *<input name="asset" maxlength="120" placeholder="Stand principal" required></label></div>
-<div class="two"><label>¿Qué se dañó?<select name="scope"><option>Elemento específico</option><option>Área del stand</option><option>Stand completo</option><option>Mueble suelto</option></select></label><label>Pieza o área *<input name="area" maxlength="120" placeholder="Mostrador frontal" required></label></div>
-<label>Problema / arreglo requerido *<textarea name="problem" required maxlength="2000" placeholder="Describe qué sucede y qué necesita atención"></textarea></label>
-<label>Motivo o causa del daño<input name="cause" maxlength="250" placeholder="Montaje, traslado, desgaste..."></label>
-<label>Solución<select name="solutionMode"><option value="instrucciones">Se conoce el trabajo a realizar</option><option value="propuesta">Necesitamos propuesta de solución</option></select></label>
-<label>Instrucciones o detalles<textarea name="instructions" maxlength="2000"></textarea></label>
-<label>Planos, artes, materiales (HTTPS)<input name="materialLink" type="url" placeholder="https://..."></label>
-<div class="two"><label>Fecha requerida<input name="dueDate" type="date"></label><label>Prioridad<select name="priority"><option>Normal</option><option>Alta</option><option>Urgente</option></select></label></div>
-<button type="submit" class="red" id="submitRequest">Crear solicitud y folio</button>
-<p class="form-help">Después podrás adjuntar las fotografías al folio creado, sin perderlas al cerrar la página.</p>
-</form></section>
-<section class="panel"><div class="detail-head"><h2>Solicitudes <span id="total" class="muted"></span></h2><div class="actions" style="margin:0"><input id="filter" type="search" placeholder="Buscar por folio, proyecto o pieza" aria-label="Buscar solicitudes" style="max-width:265px;margin:0"><select id="statusFilter" aria-label="Filtrar por estado" style="max-width:170px;margin:0"><option value="">Todos los estados</option><option value="pendiente">Pendiente</option><option value="revision">En revisión</option><option value="cotizando">Cotizando</option><option value="autorizado">Autorizado</option><option value="reparacion">En reparación</option><option value="terminado">Terminado</option><option value="entregado">Entregado</option></select></div></div>
-<div id="repairMetrics" class="muted" style="margin-bottom:15px"></div>
-<div id="records"></div><hr><div id="detail"><p class="muted">Selecciona una solicitud para ver su estado, fotos y seguimiento.</p></div></section>
 </div>
+</details>
 </section><p id="message" role="status" aria-live="polite"></p>
 <footer>ÁGORA Dejavú · Sin acceso anónimo. La aprobación de trabajos y presupuestos solo corresponde a coordinación.</footer>
 </main>
