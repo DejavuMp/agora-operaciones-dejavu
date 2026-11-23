@@ -8,12 +8,12 @@ import {getStorage,ref as storageRef,uploadBytes,getBlob} from "https://www.gsta
 const fb=window.AGORA_FIREBASE,auth=fb?.auth,db=fb?.firestore,storage=fb?.app?getStorage(fb.app):null;
 const $=id=>document.getElementById(id),esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const COLL="agora_repair_requests",EVENTS="agora_repair_events";
-let currentUser=null,coordinator=false,rows=[],assets=[],selected="",selectedAsset="",unsub=null,unsubEvents=null,unsubAssets=null,unsubInvites=null,session=0;
+let currentUser=null,coordinator=false,rows=[],ownedRows=[],assignedRows=[],staffMembers=[],assets=[],selected="",selectedAsset="",unsub=null,unsubAssigned=null,unsubMembers=null,unsubEvents=null,unsubAssets=null,unsubInvites=null,session=0;
 function feedback(message,error=false){$("message").textContent=message;$("message").className=error?"error":"ok";}
 function gate(text,canLogin=true){$("workspace").hidden=true;$("gate").hidden=false;$("gateText").textContent=text;$("login").hidden=!canLogin;}
 const requestRef=id=>doc(db,COLL,id),logRef=()=>doc(collection(db,EVENTS));
 const link=id=>{const u=new URL("./reparaciones.html",location.href);u.searchParams.set("solicitud",id);return u.href;};
-function reset(){session++;if(unsub){unsub();unsub=null;}if(unsubEvents){unsubEvents();unsubEvents=null;}if(unsubAssets){unsubAssets();unsubAssets=null;}if(unsubInvites){unsubInvites();unsubInvites=null;}rows=[];assets=[];selected="";selectedAsset="";currentUser=null;coordinator=false;$("detail").textContent="";$("records").textContent="";}
+function reset(){session++;if(unsub){unsub();unsub=null;}if(unsubEvents){unsubEvents();unsubEvents=null;}if(unsubAssets){unsubAssets();unsubAssets=null;}if(unsubInvites){unsubInvites();unsubInvites=null;}if(unsubAssigned){unsubAssigned();unsubAssigned=null;}if(unsubMembers){unsubMembers();unsubMembers=null;}rows=[];ownedRows=[];assignedRows=[];staffMembers=[];assets=[];selected="";selectedAsset="";currentUser=null;coordinator=false;$("detail").textContent="";$("records").textContent="";}
 async function start(user){
  reset();if(!user){gate("Inicia sesión con tu cuenta vinculada a ÁGORA.");return;}
  if(!user.emailVerified){gate("Verifica tu correo de Google antes de ingresar.",false);return;}
@@ -33,15 +33,16 @@ async function start(user){
   document.querySelectorAll("[data-coord]").forEach(el=>el.hidden=!coordinator);
   $("gate").hidden=true;$("workspace").hidden=false;
   listenCatalog(token);
+  if(coordinator)listenMembers(token);
+  else unsubAssigned=onSnapshot(query(collection(db,COLL),where("assignedUid","==",user.uid),limit(150)),s=>{
+   if(token!==session||s.metadata.fromCache)return;
+   assignedRows=s.docs.map(d=>({...d.data(),id:d.id}));refreshRequests();
+  },e=>feedback("No se cargaron tus reparaciones asignadas: "+e.message,true));
   const q=coordinator?query(collection(db,COLL),limit(150)):query(collection(db,COLL),where("createdBy","==",user.uid),limit(150));
   unsub=onSnapshot(q,{includeMetadataChanges:true},s=>{
    if(token!==session)return;
    if(s.metadata.fromCache){feedback("Sincronizando datos con Firebase…");return;}
-   rows=s.docs.map(d=>({...d.data(),id:d.id})).sort((a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
-   $("total").textContent="("+rows.length+")";
-   renderList();if(selected)renderDetail(selected);
-   else if(new URLSearchParams(location.search).get("solicitud"))select(new URLSearchParams(location.search).get("solicitud"));
-   feedback("Registros sincronizados con Firebase.");
+   ownedRows=s.docs.map(d=>({...d.data(),id:d.id}));refreshRequests();
   },e=>{gate("No se pueden consultar las solicitudes: "+(e.message||e)+". Revisa las reglas Firestore.",true);feedback("Lectura denegada o sin conexión.",true);});
  }catch(e){if(token===session){gate("No se pudo validar tu cuenta: "+(e.message||e),false);feedback("No se otorgó acceso sin verificar permisos.",true);}}
 }
@@ -69,6 +70,22 @@ function renderList(){
   <b>${esc(r.asset)} · ${esc(r.area)}</b><span class="status">${esc(r.status)}</span>
   <small>${esc(r.project)} · ${esc(r.priority)} · Folio ${esc(r.id.slice(0,8))}</small></button>`).join("")||'<p class="muted">No hay solicitudes con este filtro.</p>';
  $("records").querySelectorAll("[data-record]").forEach(b=>b.onclick=()=>select(b.dataset.record));
+}
+function refreshRequests(){
+ const merged=new Map([...ownedRows,...assignedRows].map(r=>[r.id,r]));
+ rows=[...merged.values()].sort((a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
+ $("total").textContent="("+rows.length+")";
+ renderList();
+ if(selected)renderDetail(selected);
+ else if(new URLSearchParams(location.search).get("solicitud"))select(new URLSearchParams(location.search).get("solicitud"));
+}
+function listenMembers(token){
+ unsubMembers=onSnapshot(query(collection(db,"agora_ops_members"),limit(300)),s=>{
+  if(token!==session)return;
+  staffMembers=s.docs.map(x=>({...x.data(),uid:x.id})).filter(x=>x.active&&x.role==="staff")
+   .sort((a,b)=>(a.email||"").localeCompare(b.email||""));
+  if(selected)renderDetail(selected);
+ },e=>feedback("No se pudo cargar el catálogo de personal: "+e.message,true));
 }
 $("filter").oninput=renderList;
 function select(id){
@@ -113,7 +130,7 @@ function renderDetail(id){
  ${safeUrl(r.materialLink)?`<p><a href="${esc(safeUrl(r.materialLink))}" target="_blank" rel="noopener noreferrer">Abrir materiales / planos</a></p>`:""}
  <div class="actions"><button id="copy">Copiar ficha</button><button id="email">Correo</button><button id="whatsapp">WhatsApp</button><button id="pdf">PDF</button><button id="png">Imagen PNG</button><button id="copyLink">Copiar enlace</button></div>
  <div class="two" style="align-items:start"><div><h3 style="font-size:14px">Enlace y QR privado</h3><div id="qr"></div><p class="form-help">Requiere una cuenta con permisos para abrir el expediente. No compartir con acceso anónimo.</p></div>
- <div><h3 style="font-size:14px">Evidencias</h3><div id="photos" class="photos"></div><label>Adjuntar fotografías JPEG/PNG<input id="photoFiles" type="file" multiple accept="image/*"></label><button id="uploadPhotos">Guardar fotografías</button><p class="form-help">Máximo 12 evidencias por folio, 5 MB por imagen guardada.</p></div></div>
+ <div><h3 style="font-size:14px">Evidencias</h3><div id="photos" class="photos"></div><label>Adjuntar fotografías JPEG/PNG<input id="photoFiles" type="file" multiple accept="image/*"></label><label>Tipo de evidencia<select id="photoStage"><option value="antes">Antes</option><option value="avance">Durante</option><option value="despues">Después</option></select></label><button id="uploadPhotos">Guardar fotografías</button><p class="form-help">Máximo 12 evidencias por folio, 5 MB por imagen guardada.</p></div></div>
  <hr><h3 style="font-size:15px">Cotizaciones</h3>${quotes}
  ${coordinator?`<section id="supplierInvites" style="margin-top:20px"></section><hr>`:""}
  ${coordinator?`<form id="quoteForm"><h3 style="font-size:13px">Agregar cotización</h3><div class="two"><label>Proveedor<input name="provider" maxlength="160" required></label><label>Importe MXN<input type="number" min="0" max="99999999" step=".01" name="amount" required></label></div><label>Alcance / trabajo<input name="scope" maxlength="500"></label><label>Enlace HTTPS de cotización<input name="link" type="url"></label><label>Observaciones<input name="note" maxlength="500"></label><button type="submit">Guardar propuesta</button></form>
@@ -121,6 +138,10 @@ function renderDetail(id){
  <div class="two"><label>Quién lo resolverá<select name="repairRoute">${ROUTES.map(v=>`<option value="${v}" ${v===r.repairRoute?"selected":""}>${esc(({pendiente:"Pendiente",staff:"Staff",agencia:"Coordinación / agencia",proveedor:"Proveedor existente",nuevo:"Proveedor nuevo",cotizar:"Solicitar cotización",comparar:"Comparar cotizaciones"})[v])}</option>`).join("")}</select></label>
  <label>Estado<select name="status">${STATUSES.map(v=>`<option value="${v}" ${v===r.status?"selected":""}>${esc(v)}</option>`).join("")}</select></label></div>
  <label>Responsable / empresa<input name="assignedTo" maxlength="160" value="${esc(r.assignedTo)}"></label>
+ <label>Cuenta ÁGORA del staff asignado<select name="assignedUid">
+ <option value="">Sin cuenta asignada / proveedor externo</option>
+ ${staffMembers.map(m=>`<option value="${esc(m.uid)}" ${m.uid===r.assignedUid?"selected":""}>${esc(m.email||m.personId||m.uid)}</option>`).join("")}
+ </select></label>
  <label>Costo estimado MXN<input name="estimatedCost" type="number" min="0" step=".01" max="99999999" value="${Number(r.estimatedCost||0)}"></label>
  <label>Observaciones / justificación<textarea name="decisionNote" maxlength="2000">${esc(r.decisionNote)}</textarea></label>
  <button type="submit" class="primary">Guardar decisión y seguimiento</button></form>
@@ -133,7 +154,10 @@ function renderDetail(id){
  $("pdf").onclick=()=>makePdf(r);
  $("png").onclick=()=>makePng(r);
  $("uploadPhotos").onclick=()=>uploadPhotos(r);
- if(!coordinator)return;
+ if(!coordinator){
+  $("progressForm").onsubmit=e=>{e.preventDefault();saveProgress(r,e.target);};
+  loadHistory(r);return;
+ }
  unsubInvites=mountInvitations($("supplierInvites"),{db,request:r,user:currentUser,notice:feedback,alreadyImported:token=>(r.quotes||[]).some(q=>q.sourceInviteId===token),importProposal:invite=>importExternalQuote(r,invite)});
  $("decisionForm").onsubmit=e=>{e.preventDefault();const f=Object.fromEntries(new FormData(e.target).entries());saveDecision(r,f);};
  $("quoteForm").onsubmit=e=>{e.preventDefault();addQuote(r,Object.fromEntries(new FormData(e.target).entries()));};
@@ -156,7 +180,7 @@ async function saveDecision(r,f){
   const cost=Number(f.estimatedCost);if(!Number.isFinite(cost)||cost<0||cost>99999999)throw Error("Costo inválido");
   await update(r.id,"decisión","Ruta "+f.repairRoute+" / Estado "+f.status,()=>({
    repairRoute:f.repairRoute,status:f.status,assignedTo:clean(f.assignedTo,160),
-   decisionNote:clean(f.decisionNote,2000),estimatedCost:cost,decisionBy:currentUser.name
+   decisionNote:clean(f.decisionNote,2000),estimatedCost:cost,assignedUid:clean(f.assignedUid,128),decisionBy:currentUser.name
   }));feedback("Decisión registrada en Firebase.");
  }catch(e){feedback("No se guardó la decisión: "+e.message,true);}
 }
@@ -218,7 +242,7 @@ async function uploadPhotos(r){
     const snap=await tx.get(requestRef(r.id));if(!snap.exists())throw Error("Folio no encontrado");
     const old=snap.data(),photos=[...(old.photos||[])];
     if(photos.length>=12)throw Error("Límite de imágenes del folio");
-    photos.push({path,label:clean(file.name,120)});
+    photos.push({path,label:clean(file.name,120),stage:$("photoStage")?.value||"avance"});
     tx.update(requestRef(r.id),{photos,revision:old.revision+1,updatedAt:serverTimestamp()});
     tx.set(logRef(),{requestId:r.id,actorUid:currentUser.uid,actorEmail:currentUser.email,action:"evidencia",detail:clean(file.name,120),createdAt:serverTimestamp()});
    });
@@ -228,11 +252,12 @@ async function uploadPhotos(r){
 }
 async function loadHistory(r){
  if(unsubEvents){unsubEvents();unsubEvents=null;}
- if(!coordinator)return;
- unsubEvents=onSnapshot(query(collection(db,EVENTS),where("requestId","==",r.id),limit(100)),snap=>{
+ const q=coordinator?query(collection(db,EVENTS),where("requestId","==",r.id),limit(100)):
+   query(collection(db,EVENTS),where("actorUid","==",currentUser.uid),limit(150));
+ unsubEvents=onSnapshot(q,snap=>{
   if(selected!==r.id)return;
   const el=$("history");if(!el)return;
-  const log=snap.docs.map(d=>d.data()).sort((a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
+  const log=snap.docs.map(d=>d.data()).filter(x=>x.requestId===r.id).sort((a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
   el.innerHTML=log.map(x=>`<li>${esc(x.createdAt?.toDate?.().toLocaleString("es-MX")||"Guardado")} · ${esc(x.action)} · ${esc(x.actorEmail)} · ${esc(x.detail)}</li>`).join("")||"<li>Sin movimientos registrados</li>";
  },()=>{const el=$("history");if(el)el.textContent="Historial no disponible hasta activar las reglas.";});
 }
