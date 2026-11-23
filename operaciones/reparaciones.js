@@ -2,10 +2,11 @@ import "../firebase-init.js";
 import {clean,safeUrl,makeRequest,makeQuote,summary,encodeCsv,STATUSES,ROUTES} from "./reparaciones-model.mjs";
 import {quoteFromInvite} from "./reparaciones-invitaciones-model.mjs";
 import {mountInvitations} from "./reparaciones-invitaciones-ui.mjs";
+import {compressSparkPhoto,photoRefId,photoMarker,sparkPhotoPayload} from "./reparaciones-fotos-spark.mjs";
 import {GoogleAuthProvider,onAuthStateChanged,signInWithPopup,signInWithRedirect,signOut} from "https://www.gstatic.com/firebasejs/13.1.0/firebase-auth.js";
 import {collection,doc,query,where,limit,onSnapshot,getDocFromServer,serverTimestamp,writeBatch,runTransaction} from "https://www.gstatic.com/firebasejs/13.1.0/firebase-firestore.js";
-import {getStorage,ref as storageRef,uploadBytes,getBlob} from "https://www.gstatic.com/firebasejs/13.1.0/firebase-storage.js";
-const fb=window.AGORA_FIREBASE,auth=fb?.auth,db=fb?.firestore,storage=fb?.app?getStorage(fb.app):null;
+// Plan Spark: fotos comprimidas en documentos privados de Firestore. Sin Storage.
+const fb=window.AGORA_FIREBASE,auth=fb?.auth,db=fb?.firestore;
 const $=id=>document.getElementById(id),esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const COLL="agora_repair_requests",EVENTS="agora_repair_events";
 let currentUser=null,coordinator=false,rows=[],ownedRows=[],assignedRows=[],staffMembers=[],assets=[],selected="",selectedAsset="",unsub=null,unsubAssigned=null,unsubMembers=null,unsubEvents=null,unsubAssets=null,unsubInvites=null,session=0;
@@ -48,7 +49,7 @@ async function start(user){
 }
 $("login").onclick=async()=>{try{await signInWithPopup(auth,new GoogleAuthProvider());}catch(e){if(e.code==="auth/popup-blocked")await signInWithRedirect(auth,new GoogleAuthProvider());else feedback(e.message,true);}};
 $("logout").onclick=()=>signOut(auth);
-if(auth&&db&&storage)onAuthStateChanged(auth,start,e=>gate("Error de autenticación: "+e.message,false));
+if(auth&&db)onAuthStateChanged(auth,start,e=>gate("Error de autenticación: "+e.message,false));
 else gate("Firebase no está disponible. No se permite guardar localmente.",false);
 const form=$("requestForm");
 form.onsubmit=async e=>{
@@ -111,15 +112,27 @@ function qr(){
  else el.textContent="Copia el enlace privado (QR temporalmente no disponible).";
 }
 function detailRow(name,value){return `<dt>${esc(name)}</dt><dd>${esc(value||"—")}</dd>`;}
+async function getSparkPhoto(path){
+ const id=photoRefId(path);
+ if(!id)throw Error("Esta fotografía antigua pertenece a Storage, que no está habilitado");
+ const snap=await getDocFromServer(doc(db,"agora_repair_photos",id));
+ if(!snap.exists())throw Error("No hay foto registrada o no tienes permiso para consultarla");
+ return snap.data().dataUrl;
+}
 async function renderPhotos(record){
- const parent=$("photos");if(!parent)return;parent.textContent="Cargando fotografías protegidas...";
+ const parent=$("photos");if(!parent)return;
+ parent.textContent="Cargando fotografías privadas...";
  if(!record.photos?.length){parent.textContent="Sin fotografías todavía.";return;}
  parent.replaceChildren();
  for(const item of record.photos.slice(0,12)){
-  const img=document.createElement("img");img.alt=item.label||"Evidencia de reparación";img.loading="lazy";
-  const anchor=document.createElement("a");anchor.rel="noopener noreferrer";anchor.target="_blank";anchor.append(img);parent.append(anchor);
-  try{const blob=await getBlob(storageRef(storage,item.path));if(selected!==record.id)return;const url=URL.createObjectURL(blob);img.src=url;anchor.href=url;anchor.download=(item.label||"evidencia")+".jpg";}
-  catch(_){anchor.replaceWith(document.createTextNode("Foto no disponible · "));}
+  const img=document.createElement("img"),anchor=document.createElement("a");
+  img.alt=item.label||"Evidencia de reparación";img.loading="lazy";
+  anchor.rel="noopener noreferrer";anchor.target="_blank";anchor.append(img);parent.append(anchor);
+  try{
+   const data=await getSparkPhoto(item.path);
+   if(selected!==record.id)return;
+   img.src=data;anchor.href=data;anchor.download=(item.label||"evidencia")+".jpg";
+  }catch(_){anchor.replaceWith(document.createTextNode("Foto no disponible · "));}
  }
 }
 function renderDetail(id){
@@ -136,7 +149,7 @@ function renderDetail(id){
  ${safeUrl(r.materialLink)?`<p><a href="${esc(safeUrl(r.materialLink))}" target="_blank" rel="noopener noreferrer">Abrir materiales / planos</a></p>`:""}
  <div class="actions"><button id="copy">Copiar ficha</button><button id="email">Correo</button><button id="whatsapp">WhatsApp</button><button id="pdf">PDF</button><button id="png">Imagen PNG</button><button id="copyLink">Copiar enlace</button></div>
  <div class="two" style="align-items:start"><div><h3 style="font-size:14px">Enlace y QR privado</h3><div id="qr"></div><p class="form-help">Requiere una cuenta con permisos para abrir el expediente. No compartir con acceso anónimo.</p></div>
- <div><h3 style="font-size:14px">Evidencias</h3><div id="photos" class="photos"></div><label>Adjuntar fotografías JPEG/PNG<input id="photoFiles" type="file" multiple accept="image/*"></label><label>Tipo de evidencia<select id="photoStage"><option value="antes">Antes</option><option value="avance">Durante</option><option value="despues">Después</option></select></label><button id="uploadPhotos">Guardar fotografías</button><p class="form-help">Máximo 12 evidencias por folio, 5 MB por imagen guardada.</p></div></div>
+ <div><h3 style="font-size:14px">Evidencias</h3><div id="photos" class="photos"></div><label>Adjuntar fotografías JPEG/PNG<input id="photoFiles" type="file" multiple accept="image/*"></label><label>Tipo de evidencia<select id="photoStage"><option value="antes">Antes</option><option value="avance">Durante</option><option value="despues">Después</option></select></label><button id="uploadPhotos">Guardar fotografías</button><p class="form-help">Máximo 12 evidencias por folio. Vista previa JPEG comprimida, menor a 90 KB. Conserva el original en Drive.</p></div></div>
  ${!coordinator?`<hr><h3 style="font-size:15px">Registrar avance del arreglo</h3>
  <form id="progressForm"><label>¿Qué se hizo o qué falta?<textarea name="detail" minlength="3" maxlength="500" required placeholder="Ej. Se reparó la estructura y se anexaron fotos del resultado"></textarea></label>
  <button type="submit" class="primary">Guardar avance</button></form>
@@ -241,36 +254,31 @@ async function chooseQuote(r,id){
   return {selectedQuoteId:id,estimatedCost:q.amount,repairRoute:"proveedor",assignedTo:q.provider,decisionBy:currentUser.name,status:"revision"};
  });feedback("Propuesta seleccionada para revisión.");}catch(e){feedback(e.message,true);}
 }
-async function resize(file){
- const url=URL.createObjectURL(file);
- try{
-  const image=await new Promise((resolve,reject)=>{const im=new Image;im.onload=()=>resolve(im);im.onerror=reject;im.src=url;});
-  const scale=Math.min(1,1600/Math.max(image.naturalWidth,image.naturalHeight));
-  const canvas=document.createElement("canvas");canvas.width=Math.round(image.naturalWidth*scale);canvas.height=Math.round(image.naturalHeight*scale);
-  const ctx=canvas.getContext("2d");ctx.fillStyle="white";ctx.fillRect(0,0,canvas.width,canvas.height);ctx.drawImage(image,0,0,canvas.width,canvas.height);
-  const blob=await new Promise(resolve=>canvas.toBlob(resolve,"image/jpeg",.82));if(!blob||blob.size>5*1024*1024)throw Error("Imagen superior a 5 MB");
-  return blob;
- }finally{URL.revokeObjectURL(url);}
-}
 async function uploadPhotos(r){
- const files=[...($("photoFiles")?.files||[])];if(!files.length)return feedback("Selecciona una o más fotos.",true);
- if(files.length+(r.photos||[]).length>12)return feedback("Máximo 12 fotografías por solicitud.",true);
+ const files=[...($("photoFiles")?.files||[])];
+ if(!files.length)return feedback("Selecciona fotografías.",true);
+ if(files.length+(r.photos||[]).length>12)return feedback("Máximo 12 fotografías por reparación.",true);
  const button=$("uploadPhotos");button.disabled=true;
  try{
   for(const file of files){
-   if(!file.type.startsWith("image/"))throw Error("Solo se admiten imágenes");
-   const data=await resize(file),path=`agora-repairs/${r.id}/${currentUser.uid}/${crypto.randomUUID()}.jpg`;
-   await uploadBytes(storageRef(storage,path),data,{contentType:"image/jpeg",customMetadata:{requestId:r.id}});
+   const dataUrl=await compressSparkPhoto(file);
+   const photoId=crypto.randomUUID(),path=photoMarker(photoId);
+   const stage=$("photoStage")?.value||"avance",label=clean(file.name,120);
+   const image=sparkPhotoPayload({id:photoId,kind:"request",ownerId:r.id,
+    uploadedBy:currentUser.uid,dataUrl,label,stage,createdAt:serverTimestamp()});
    await runTransaction(db,async tx=>{
     const snap=await tx.get(requestRef(r.id));if(!snap.exists())throw Error("Folio no encontrado");
     const old=snap.data(),photos=[...(old.photos||[])];
-    if(photos.length>=12)throw Error("Límite de imágenes del folio");
-    photos.push({path,label:clean(file.name,120),stage:$("photoStage")?.value||"avance"});
+    if(photos.length>=12)throw Error("Límite de evidencias alcanzado");
+    photos.push({path,label,stage});
+    tx.set(doc(db,"agora_repair_photos",photoId),image);
     tx.update(requestRef(r.id),{photos,revision:old.revision+1,updatedAt:serverTimestamp()});
-    tx.set(logRef(),{requestId:r.id,actorUid:currentUser.uid,actorEmail:currentUser.email,action:"evidencia",detail:clean(file.name,120),createdAt:serverTimestamp()});
+    tx.set(logRef(),{requestId:r.id,actorUid:currentUser.uid,actorEmail:currentUser.email,
+      action:"evidencia",detail:label,createdAt:serverTimestamp()});
    });
-  }feedback("Evidencias guardadas y asociadas al folio.");
- }catch(e){feedback("No se completó la carga: "+e.message+". Puede haber una imagen pendiente de asociar; avisa a coordinación.",true)}
+  }
+  feedback("Evidencias comprimidas y guardadas en Firestore, sin facturación de Storage.");
+ }catch(e){feedback("No se guardó la evidencia: "+e.message,true)}
  finally{button.disabled=false;}
 }
 async function loadHistory(r){
@@ -386,8 +394,10 @@ async function showAsset(id){
  for(const path of a.photoPaths){
   const img=document.createElement("img");img.alt="Fotografía de "+a.piece;img.loading="lazy";
   root.append(img);
-  try{const blob=await getBlob(storageRef(storage,path));if(selectedAsset!==id)return;img.src=URL.createObjectURL(blob);}
-  catch{img.alt="Foto sin acceso";img.title="No se pudo leer esta imagen";}
+  try{
+   const data=await getSparkPhoto(path);
+   if(selectedAsset!==id)return;img.src=data;
+  }catch{img.alt="Fotografía no disponible";img.title="No fue posible cargar esta imagen";}
  }
 }
 async function uploadAssetPhotos(asset){
@@ -397,18 +407,21 @@ async function uploadAssetPhotos(asset){
  const button=$("assetUpload");button.disabled=true;
  try{
   for(const file of files){
-   if(!file.type.startsWith("image/"))throw Error("Solo imágenes.");
-   const jpg=await resize(file),path=`agora-repair-assets/${asset.id}/${currentUser.uid}/${crypto.randomUUID()}.jpg`;
-   await uploadBytes(storageRef(storage,path),jpg,{contentType:"image/jpeg"});
+   const dataUrl=await compressSparkPhoto(file),photoId=crypto.randomUUID(),marker=photoMarker(photoId);
+   const image=sparkPhotoPayload({id:photoId,kind:"asset",ownerId:asset.id,
+     uploadedBy:currentUser.uid,dataUrl,label:clean(file.name,120),stage:"inventario",
+     createdAt:serverTimestamp()});
    await runTransaction(db,async tx=>{
     const ref=doc(db,"agora_repair_assets",asset.id),snap=await tx.get(ref);
-    if(!snap.exists())throw Error("La pieza no existe");
+    if(!snap.exists())throw Error("Pieza de inventario no encontrada");
     const old=snap.data(),photoPaths=[...(old.photoPaths||[])];
-    if(photoPaths.length>=20)throw Error("La pieza llegó a su límite de fotos");
-    photoPaths.push(path);
+    if(photoPaths.length>=20)throw Error("Límite de 20 fotos alcanzado");
+    photoPaths.push(marker);
+    tx.set(doc(db,"agora_repair_photos",photoId),image);
     tx.update(ref,{photoPaths,revision:old.revision+1,updatedAt:serverTimestamp()});
    });
   }
-  feedback("Fotos almacenadas en el inventario de la pieza.");
- }catch(e){feedback("Error al guardar fotografías del inventario: "+e.message,true);}finally{button.disabled=false;}
+  feedback("Fotografías de inventario guardadas como vistas previas privadas en Firestore.");
+ }catch(e){feedback("No se guardaron las fotografías: "+e.message,true)}
+ finally{button.disabled=false;}
 }
