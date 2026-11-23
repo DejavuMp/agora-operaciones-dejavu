@@ -521,15 +521,17 @@ $("hcbZipInput").onchange=async()=>{
   });
   progress.textContent="Guardado verificado: "+report.total+
    " fotos asociadas ("+report.created+" nuevas, "+report.existing+
-   " existentes), siete reportes y "+report.assetCount+" piezas de inventario.";
+   " existentes) y siete conceptos dentro de una solicitud general. El historial técnico sigue protegido.";
   $("hcbImportStatus").textContent="Hot Cruji Bravo con "+report.assetCount+" piezas y "+report.total+" vistas previas privadas asociadas. Conservar el ZIP original.";
   const title=document.createElement("p");
-  title.textContent="Folios privados creados o conservados:";
+  title.textContent="Todos los conceptos de reparación están reunidos en una sola solicitud:";
   $("hcbPhotoLinks").append(title);
-  for(const item of report.requests){
+  const group=groupRepairs(rows.filter(x=>x.project===HCB_PROJECT))[0];
+  const mainId=group?.id||report.requests[0]?.id;
+  if(mainId){
    const a=document.createElement("a");
-   a.href=link(item.id);a.target="_blank";a.rel="noopener noreferrer";
-   a.textContent=item.code+" · "+item.area+" ("+item.photos+" fotos)";
+   a.href=link(mainId);a.target="_blank";a.rel="noopener noreferrer";
+   a.textContent="Abrir solicitud general · Hot Cruji Bravo ("+report.requests.length+" reparaciones fotográficas)";
    $("hcbPhotoLinks").append(a);
   }
   $("filter").value=HCB_PROJECT;
