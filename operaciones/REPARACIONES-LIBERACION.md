@@ -21,20 +21,23 @@ Las direcciones son **previstas, no declaradas activas** hasta fusionar y desple
 
 ## Datos
 - Firestore: `agora_repair_assets`, `agora_repair_requests`, `agora_repair_events`, `agora_repair_invites`.
-- Storage: `agora-repair-assets/{assetId}/{uid}/{imageId}.jpg`, `agora-repairs/{requestId}/{uid}/{imageId}.jpg`.
+- Fotografías: `agora_repair_photos/{id}` en **Cloud Firestore gratuito**, una miniatura JPEG privada por documento, máximo 90 KB; la ruta `firestore:<id>` se registra en el activo o folio. **No se usa Cloud Storage, no se requiere Blaze ni se activa facturación.**
 - Campos de historial inmutables; la solicitud mantiene revisión incremental. No hay eliminación de reportes.
 - Las cotizaciones internas son distintas de las respuestas a invitaciones externas; la incorporación al comparador se hace en transacción.
 
 ## Validación antes de liberar
-- [ ] Fusionar y probar las reglas del PR de Compras/Storage en proyecto Firebase **solo después de respaldo y conciliación con producción**; revisar especialmente que no se revoque acceso a módulos existentes.
-- [ ] Ejecutar pruebas de Firestore y Storage con emuladores y todas las suites de Operaciones.
-- [ ] Habilitar Storage con políticas seguras; el workflow actual de reglas **solo** despliega Firestore.
-- [ ] Confirmar CORS para descargas autenticadas de `getBlob` desde GitHub Pages y verificar las imágenes desde dos navegadores.
+- [ ] Activar en Firestore las reglas del PR de **Spark sin facturación**, únicamente después del respaldo y conciliación con las reglas reales de producción; no sobrescribir permisos de los otros módulos.
+- [x] Ejecutar pruebas de Firestore Spark en emuladores y las suites de Operaciones (aprobadas en ramas de revisión).
+- [x] Eliminar la dependencia de Storage y facturación de la herramienta; conservar el proyecto Firebase en Spark.
+- [ ] Verificar desde dos cuentas reales que las miniaturas privadas se visualizan en móvil y computadora; la visualización usa Firestore y no requiere CORS de Storage.
 - [ ] Alta de una pieza y reporte real con dos cuentas autorizadas, con la cuenta asignada viendo el trabajo y enviando avance.
 - [ ] Confirmar que otro staff y usuarios anónimos NO ven fotografías del expediente interno.
 - [ ] Invitación externa: abrir sin cuenta, enviar una cotización, intentar segundo envío (denegado), revocar otra invitación (denegada) y verificar vencimiento.
 - [ ] Verificar un PDF descargado, su botón de enlace y QR, una imagen PNG y el mensaje de WhatsApp/correo.
-- [ ] Cargar/etiquetar las 42 fotografías originales del ZIP Hot Cruji Bravo tras recuperar sus bytes. **No se han cargado a Firebase**.
+- [ ] Cargar y etiquetar las 42 fotografías Hot Cruji Bravo como **vistas previas optimizadas** cuando estén accesibles; los originales de alta resolución deberán conservarse en Drive. **No se han cargado a Firebase**.
 - [ ] Verificar respaldo, reglas activas, publicación GitHub Pages y ausencia de errores de consola, antes de comunicar el enlace al equipo.
 
 **Estado**: desarrollo en las ramas de revisión de los PR #11 (Operaciones) y #51 (Compras). Prohibido afirmar que la base de producción ya se migró sin comprobarla.
+
+## Límite del plan sin facturación
+Cloud Firestore Spark permite trabajar sin activar Blaze, dentro de sus cuotas. Las fotos se comprimen en el navegador hasta 90 KB y se guardan separadas del resumen, para evitar documentos grandes. Cada pieza admite hasta 20 vistas previas y cada folio hasta 12. La calidad es suficiente para inspección y seguimiento, **no sustituye originales para impresión, edición o respaldo de alta resolución**. Conservarlos en una carpeta de Google Drive y vincular esa carpeta en `materialLink`.
