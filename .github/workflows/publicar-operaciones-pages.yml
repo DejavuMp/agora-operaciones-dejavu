@@ -79,5 +79,7 @@ jobs:
       - uses: actions/upload-pages-artifact@v4
         with:
           path: _site
+      - name: Esperar a que GitHub Pages registre el artefacto recién cargado
+        run: sleep 25
       - id: deployment
         uses: actions/deploy-pages@v4
