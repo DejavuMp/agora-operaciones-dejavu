@@ -2,7 +2,7 @@ import "../firebase-init.js";
 import {clean,safeUrl,makeRequest,makeQuote,summary,encodeCsv,STATUSES,ROUTES} from "./reparaciones-model.mjs";
 import {GoogleAuthProvider,onAuthStateChanged,signInWithPopup,signInWithRedirect,signOut} from "https://www.gstatic.com/firebasejs/13.1.0/firebase-auth.js";
 import {collection,doc,query,where,limit,onSnapshot,getDocFromServer,serverTimestamp,writeBatch,runTransaction} from "https://www.gstatic.com/firebasejs/13.1.0/firebase-firestore.js";
-import {getStorage,ref as storageRef,uploadBytes,getDownloadURL} from "https://www.gstatic.com/firebasejs/13.1.0/firebase-storage.js";
+import {getStorage,ref as storageRef,uploadBytes,getBlob} from "https://www.gstatic.com/firebasejs/13.1.0/firebase-storage.js";
 const fb=window.AGORA_FIREBASE,auth=fb?.auth,db=fb?.firestore,storage=fb?.app?getStorage(fb.app):null;
 const $=id=>document.getElementById(id),esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const COLL="agora_repair_requests",EVENTS="agora_repair_events";
@@ -85,7 +85,7 @@ async function renderPhotos(record){
  for(const item of record.photos.slice(0,12)){
   const img=document.createElement("img");img.alt=item.label||"Evidencia de reparación";img.loading="lazy";
   const anchor=document.createElement("a");anchor.rel="noopener noreferrer";anchor.target="_blank";anchor.append(img);parent.append(anchor);
-  try{const url=await getDownloadURL(storageRef(storage,item.path));if(selected!==record.id)return;img.src=url;anchor.href=url;}
+  try{const blob=await getBlob(storageRef(storage,item.path));if(selected!==record.id)return;const url=URL.createObjectURL(blob);img.src=url;anchor.href=url;anchor.download=(item.label||"evidencia")+".jpg";}
   catch(_){anchor.replaceWith(document.createTextNode("Foto no disponible · "));}
  }
 }
