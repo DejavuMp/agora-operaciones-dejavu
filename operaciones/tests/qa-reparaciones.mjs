@@ -7,6 +7,7 @@ import {createInviteToken,invitePayload,supplierResponse,quoteFromInvite,supplie
 import {photoRefId,photoMarker,validatePhotoData,sparkPhotoPayload,MAX_PHOTO_CHARS} from "../reparaciones-fotos-spark.mjs";
 import {HCB_PROJECT,HCB_STAND,HCB_ASSETS,HCB_INSPECTIONS,HCB_CASE,hcbAssetById,hcbImportPlan} from "../hot-cruji-bravo-caso.mjs";
 import {groupRepairs,bundleByItem,bundleStatus,bundleSummary,bundledCsv,HCB_GROUP_ANCHOR} from "../reparaciones-agrupadas.mjs";
+import {repairEditPatch,repairGroupPatch,checkEditRevision} from "../reparaciones-editar.mjs";
 const id="d630d5ec-4e3a-4d51-92b2-0d917f43ebc9";
 const user={uid:"u-01",email:"staff@example.test",name:"Staff de prueba"};
 const raw={project:"Hot Cruji Bravo",asset:"Stand principal",assetId:"",scope:"Elemento específico",
@@ -251,4 +252,50 @@ test("Exportación CSV: una fila por solicitud general y ninguna fórmula ejecut
  assert.ok(csv.includes("Canto (pendiente)"));
  assert.ok(csv.includes("Pintura (terminado)"));
  assert.ok(csv.includes("'=HYPERLINK"),"No ejecutar fórmulas en Excel");
+});
+
+test("Reparaciones: editar un concepto sin alterar identidad, fotos, cotizaciones o responsable",()=>{
+ const patch=repairEditPatch({
+  area:"Panel lateral",problem:"Rayones y golpes visibles",
+  scope:"Elemento específico",priority:"Alta",dueDate:"2026-12-05",
+  cause:"Traslado",solutionMode:"propuesta",instructions:"Revisar antes de reparar",
+  materialLink:"https://example.org/plano",createdBy:"intruso",
+  status:"entregado",photos:[{path:"inventada"}],quotes:[{amount:1}]
+ });
+ assert.equal(patch.area,"Panel lateral");
+ assert.equal(patch.priority,"Alta");
+ assert.equal(patch.solutionMode,"propuesta");
+ assert.equal(patch.materialLink,"https://example.org/plano");
+ for(const protectedKey of ["createdBy","status","photos","quotes","assignedUid","revision","createdAt"]){
+  assert.ok(!Object.hasOwn(patch,protectedKey),protectedKey+" debe permanecer protegido");
+ }
+ assert.throws(()=>repairEditPatch({area:"",problem:"Daño"}),/pieza o área/);
+ assert.throws(()=>repairEditPatch({area:"Panel",problem:""}),/problema/);
+ assert.throws(()=>repairEditPatch({area:"Panel",problem:"Daño",materialLink:"http://example.org"}),/HTTPS/);
+});
+test("Reparaciones: editar datos generales de todos los conceptos con control de versión",()=>{
+ assert.deepEqual(repairGroupPatch({project:" Hot Cruji Bravo ",asset:" Stand principal ",photos:[],createdBy:"admin"}),
+  {project:"Hot Cruji Bravo",asset:"Stand principal"});
+ assert.throws(()=>repairGroupPatch({project:"",asset:"Stand"}),/obligatorios/);
+ assert.equal(checkEditRevision({revision:4},4),true);
+ assert.throws(()=>checkEditRevision({revision:5},4),/cambió mientras editabas/);
+});
+test("Reparaciones: la interfaz permite editar, cancelar, agregar y guardar historial en Firebase",()=>{
+ const base=fileURLToPath(new URL("../",import.meta.url));
+ const js=readFileSync(base+"reparaciones.js","utf8");
+ const html=readFileSync(base+"reparaciones.html","utf8");
+ for(const id of ["editGeneralButton","editConceptButton","editGeneralForm","editConceptForm",
+  "addConceptForm","cancelRepairEdit"]){
+  assert.ok(js.includes(id),"Debe estar presente: "+id);
+ }
+ assert.match(js,/bindRepairEditActions\(group,r\)/);
+ assert.match(js,/async function saveConceptEdit\(/);
+ assert.match(js,/async function saveGroupEdit\(/);
+ assert.match(js,/async function addConceptToGroup\(/);
+ assert.match(js,/checkEditRevision\(/);
+ assert.match(js,/action:"creada"/);
+ assert.match(js,/action:"edición general"/);
+ assert.match(js,/await runTransaction\(db,async tx=>/);
+ assert.match(html,/repair-edit-form/);
+ assert.doesNotMatch(js,/deleteDoc\(|batch\.delete\(/);
 });
