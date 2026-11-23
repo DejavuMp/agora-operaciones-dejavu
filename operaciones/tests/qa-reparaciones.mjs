@@ -217,7 +217,7 @@ test("Hot Cruji Bravo aparece como una sola solicitud general con conceptos inde
  const summary=bundleSummary(combined,"https://example.org/solicitud-general");
  for(const item of combined.items){
   assert.ok(summary.includes(item.area));
-  assert.ok(summary.includes(item.id));
+  assert.ok(!summary.includes(item.id),"No exponer folios internos en el PDF general");
  }
  assert.match(summary,/Total de conceptos: 6/);
  assert.match(summary,/Folio general:/);
