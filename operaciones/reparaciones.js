@@ -212,7 +212,7 @@ function renderDetail(id){
  <p>${esc(q.scope||"Sin alcance")} · ${esc(q.note||"")}</p>
  ${safeUrl(q.link)?`<a href="${esc(safeUrl(q.link))}" rel="noopener noreferrer" target="_blank">Ver cotización</a>`:""}
  ${coordinator?`<button data-pick="${esc(q.id)}" type="button">${q.id===r.selectedQuoteId?"Seleccionada":"Elegir cotización"}</button>`:""}</div>`).join("")||'<p class="muted">Aún no hay cotizaciones registradas.</p>';
- $("detail").innerHTML=groupTop+`<div class="detail-head"><div><h2>Arreglo: ${esc(r.area)}</h2><p class="muted">Folio completo: ${esc(r.id)}</p></div><span class="status">${esc(r.status)}</span></div>
+ $("detail").innerHTML=groupTop+`<div class="detail-head"><div><h2>Arreglo: ${esc(r.area)}</h2><details class="muted" style="margin-top:6px"><summary>Identificador interno de este concepto</summary><code>${esc(r.id)}</code></details></div><span class="status">${esc(r.status)}</span></div>
  <dl>${detailRow("Proyecto",r.project)}${detailRow("Problema",r.problem)}${detailRow("Motivo",r.cause)}${detailRow("Instrucciones",r.solutionMode==="propuesta"?"Solicitar propuesta":r.instructions)}
  ${detailRow("Requerido",r.dueDate)}${detailRow("Prioridad",r.priority)}${detailRow("Reportó",r.createdByName)}
  ${detailRow("Ruta",r.repairRoute)}${detailRow("Responsable",r.assignedTo)}${detailRow("Coordinación",r.decisionBy)}${detailRow("Notas",r.decisionNote)}</dl>
