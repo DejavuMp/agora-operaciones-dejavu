@@ -52,9 +52,9 @@ const renderStart=html.indexOf("function opsPresenceRows("),
 const renderSource=html.slice(renderStart,renderEnd);
 const renderPanel=new Function("db","liveClocks","liveBreaks","liveTrips","getPerson",
  "startOfDay","plusDays","isoLocal","overlap","dateMs","eventRegion","liveCoordinates",
- "ui","esc","getSite",renderSource+";return renderLiveDashboard()");
+ "ui","esc","getSite","now",renderSource.replace("const rows=opsPresenceRows();","const rows=opsPresenceRows(now);")+";return renderLiveDashboard()");
 const panel=renderPanel(db,clocks,breaks,trips,getPerson,startOfDay,plusDays,isoLocal,overlap,
-  dateMs,e=>e.region,()=>null,{role:"coordinador"},s=>String(s),()=>null);
+  dateMs,e=>e.region,()=>null,{role:"coordinador"},s=>String(s),()=>null,now);
 for(const label of ["Trabajando","En descanso","En traslado","Sin entrada","Jornada terminada","Programado"]){
   assert.ok(panel.includes(label),"El dashboard muestra estado "+label);
 }
