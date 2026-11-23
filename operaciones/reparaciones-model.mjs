@@ -52,6 +52,6 @@ export function summary(r,link=""){
 }
 export function encodeCsv(rows){
  const cols=["id","project","asset","area","createdByName","priority","status","repairRoute","assignedTo","dueDate","estimatedCost"];
- const q=v=>'"'+String(v??"").replaceAll('"','""')+'"';
+ const q=v=>{let s=String(v??"");if(/^[\\s]*[=+@-]/.test(s))s="'"+s;return '"'+s.replaceAll('"','""')+'"';};
  return "\ufeff"+[cols.join(","),...rows.map(r=>cols.map(k=>q(r[k])).join(","))].join("\r\n");
 }
