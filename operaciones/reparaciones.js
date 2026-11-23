@@ -356,7 +356,7 @@ function renderCatalog(){
 
 function renderHotCrujiPreview(){
  const target=$("hcbPreview"),names=document.createElement("p"),list=document.createElement("ol");
- names.textContent=HCB_CASE.overall+". Huella final por verificar. Sin fotos cargadas.";
+ names.textContent=HCB_CASE.overall+". Huella final por verificar. Fotografías originales de alta resolución conservadas fuera de ÁGORA; las miniaturas se incorporan al seleccionar el ZIP.";
  for(const a of HCB_ASSETS){
   const li=document.createElement("li");li.textContent=a.code+" · "+a.piece+" — "+a.description;list.append(li);
  }
@@ -444,6 +444,7 @@ $("hcbZipInput").onchange=async()=>{
   progress.textContent="Guardado verificado: "+report.total+
    " fotos asociadas ("+report.created+" nuevas, "+report.existing+
    " existentes), siete reportes y "+report.assetCount+" piezas de inventario.";
+  $("hcbImportStatus").textContent="Hot Cruji Bravo con "+report.assetCount+" piezas y "+report.total+" vistas previas privadas asociadas. Conservar el ZIP original.";
   const title=document.createElement("p");
   title.textContent="Folios privados creados o conservados:";
   $("hcbPhotoLinks").append(title);
