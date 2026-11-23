@@ -1,17 +1,19 @@
 import "../firebase-init.js";
 import {clean,safeUrl,makeRequest,makeQuote,summary,encodeCsv,STATUSES,ROUTES} from "./reparaciones-model.mjs";
+import {quoteFromInvite} from "./reparaciones-invitaciones-model.mjs";
+import {mountInvitations} from "./reparaciones-invitaciones-ui.mjs";
 import {GoogleAuthProvider,onAuthStateChanged,signInWithPopup,signInWithRedirect,signOut} from "https://www.gstatic.com/firebasejs/13.1.0/firebase-auth.js";
 import {collection,doc,query,where,limit,onSnapshot,getDocFromServer,serverTimestamp,writeBatch,runTransaction} from "https://www.gstatic.com/firebasejs/13.1.0/firebase-firestore.js";
 import {getStorage,ref as storageRef,uploadBytes,getBlob} from "https://www.gstatic.com/firebasejs/13.1.0/firebase-storage.js";
 const fb=window.AGORA_FIREBASE,auth=fb?.auth,db=fb?.firestore,storage=fb?.app?getStorage(fb.app):null;
 const $=id=>document.getElementById(id),esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const COLL="agora_repair_requests",EVENTS="agora_repair_events";
-let currentUser=null,coordinator=false,rows=[],assets=[],selected="",selectedAsset="",unsub=null,unsubEvents=null,unsubAssets=null,session=0;
+let currentUser=null,coordinator=false,rows=[],assets=[],selected="",selectedAsset="",unsub=null,unsubEvents=null,unsubAssets=null,unsubInvites=null,session=0;
 function feedback(message,error=false){$("message").textContent=message;$("message").className=error?"error":"ok";}
 function gate(text,canLogin=true){$("workspace").hidden=true;$("gate").hidden=false;$("gateText").textContent=text;$("login").hidden=!canLogin;}
 const requestRef=id=>doc(db,COLL,id),logRef=()=>doc(collection(db,EVENTS));
 const link=id=>{const u=new URL("./reparaciones.html",location.href);u.searchParams.set("solicitud",id);return u.href;};
-function reset(){session++;if(unsub){unsub();unsub=null;}if(unsubEvents){unsubEvents();unsubEvents=null;}if(unsubAssets){unsubAssets();unsubAssets=null;}rows=[];assets=[];selected="";selectedAsset="";currentUser=null;coordinator=false;$("detail").textContent="";$("records").textContent="";}
+function reset(){session++;if(unsub){unsub();unsub=null;}if(unsubEvents){unsubEvents();unsubEvents=null;}if(unsubAssets){unsubAssets();unsubAssets=null;}if(unsubInvites){unsubInvites();unsubInvites=null;}rows=[];assets=[];selected="";selectedAsset="";currentUser=null;coordinator=false;$("detail").textContent="";$("records").textContent="";}
 async function start(user){
  reset();if(!user){gate("Inicia sesión con tu cuenta vinculada a ÁGORA.");return;}
  if(!user.emailVerified){gate("Verifica tu correo de Google antes de ingresar.",false);return;}
@@ -98,6 +100,7 @@ async function renderPhotos(record){
  }
 }
 function renderDetail(id){
+ if(unsubInvites){unsubInvites();unsubInvites=null;}
  const r=rows.find(x=>x.id===id);if(!r){$("detail").innerHTML='<p class="muted">El folio todavía no se encuentra en tus solicitudes o no tienes permiso para verlo.</p>';return;}
  const quotes=(r.quotes||[]).map(q=>`<div class="quote ${q.id===r.selectedQuoteId?"selected":""}"><strong>${esc(q.provider)} · $${Number(q.amount).toFixed(2)} MXN</strong>
  <p>${esc(q.scope||"Sin alcance")} · ${esc(q.note||"")}</p>
@@ -112,6 +115,7 @@ function renderDetail(id){
  <div class="two" style="align-items:start"><div><h3 style="font-size:14px">Enlace y QR privado</h3><div id="qr"></div><p class="form-help">Requiere una cuenta con permisos para abrir el expediente. No compartir con acceso anónimo.</p></div>
  <div><h3 style="font-size:14px">Evidencias</h3><div id="photos" class="photos"></div><label>Adjuntar fotografías JPEG/PNG<input id="photoFiles" type="file" multiple accept="image/*"></label><button id="uploadPhotos">Guardar fotografías</button><p class="form-help">Máximo 12 evidencias por folio, 5 MB por imagen guardada.</p></div></div>
  <hr><h3 style="font-size:15px">Cotizaciones</h3>${quotes}
+ ${coordinator?`<section id="supplierInvites" style="margin-top:20px"></section><hr>`:""}
  ${coordinator?`<form id="quoteForm"><h3 style="font-size:13px">Agregar cotización</h3><div class="two"><label>Proveedor<input name="provider" maxlength="160" required></label><label>Importe MXN<input type="number" min="0" max="99999999" step=".01" name="amount" required></label></div><label>Alcance / trabajo<input name="scope" maxlength="500"></label><label>Enlace HTTPS de cotización<input name="link" type="url"></label><label>Observaciones<input name="note" maxlength="500"></label><button type="submit">Guardar propuesta</button></form>
  <hr><form id="decisionForm"><h3 style="font-size:15px">Decisión de coordinación</h3>
  <div class="two"><label>Quién lo resolverá<select name="repairRoute">${ROUTES.map(v=>`<option value="${v}" ${v===r.repairRoute?"selected":""}>${esc(({pendiente:"Pendiente",staff:"Staff",agencia:"Coordinación / agencia",proveedor:"Proveedor existente",nuevo:"Proveedor nuevo",cotizar:"Solicitar cotización",comparar:"Comparar cotizaciones"})[v])}</option>`).join("")}</select></label>
@@ -130,6 +134,7 @@ function renderDetail(id){
  $("png").onclick=()=>makePng(r);
  $("uploadPhotos").onclick=()=>uploadPhotos(r);
  if(!coordinator)return;
+ unsubInvites=mountInvitations($("supplierInvites"),{db,request:r,user:currentUser,notice:feedback,alreadyImported:token=>(r.quotes||[]).some(q=>q.sourceInviteId===token),importProposal:invite=>importExternalQuote(r,invite)});
  $("decisionForm").onsubmit=e=>{e.preventDefault();const f=Object.fromEntries(new FormData(e.target).entries());saveDecision(r,f);};
  $("quoteForm").onsubmit=e=>{e.preventDefault();addQuote(r,Object.fromEntries(new FormData(e.target).entries()));};
  document.querySelectorAll("[data-pick]").forEach(b=>b.onclick=()=>chooseQuote(r,b.dataset.pick));
@@ -163,6 +168,25 @@ async function addQuote(r,data){
    return {quotes:[...(old.quotes||[]),q],status:old.status==="pendiente"?"cotizando":old.status};
   });feedback("Cotización registrada.");
  }catch(e){feedback("No se guardó la propuesta: "+e.message,true);}
+}
+async function importExternalQuote(r,invite){
+ if(!coordinator||!currentUser)throw Error("No tienes acceso de coordinación");
+ await runTransaction(db,async tx=>{
+  const inviteSnap=await tx.get(doc(db,"agora_repair_invites",invite.id));
+  const requestSnap=await tx.get(requestRef(r.id));
+  if(!inviteSnap.exists()||!requestSnap.exists())throw Error("La invitación o el folio ya no existen");
+  const source=inviteSnap.data(),old=requestSnap.data();
+  if(source.requestId!==r.id||source.status!=="submitted")throw Error("La propuesta no está disponible");
+  if((old.quotes||[]).some(q=>q.sourceInviteId===invite.id))throw Error("La propuesta ya está integrada");
+  if((old.quotes||[]).length>=8)throw Error("Límite de 8 cotizaciones por solicitud");
+  const quote=quoteFromInvite(source,invite.id,crypto.randomUUID());
+  tx.update(requestRef(r.id),{
+   quotes:[...(old.quotes||[]),quote],status:old.status==="pendiente"?"cotizando":old.status,
+   revision:old.revision+1,updatedAt:serverTimestamp()
+  });
+  tx.set(logRef(),{requestId:r.id,actorUid:currentUser.uid,actorEmail:currentUser.email,
+   action:"cotización externa",detail:"Propuesta recibida de "+quote.provider,createdAt:serverTimestamp()});
+ });
 }
 async function chooseQuote(r,id){
  try{await update(r.id,"selección de cotización","Propuesta seleccionada",old=>{
