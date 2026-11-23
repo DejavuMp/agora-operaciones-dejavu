@@ -6,6 +6,7 @@ import {makeRequest,makeQuote,safeUrl,summary,encodeCsv,ROUTES,STATUSES} from ".
 import {createInviteToken,invitePayload,supplierResponse,quoteFromInvite,supplierInviteUrl,TOKEN_PATTERN} from "../reparaciones-invitaciones-model.mjs";
 import {photoRefId,photoMarker,validatePhotoData,sparkPhotoPayload,MAX_PHOTO_CHARS} from "../reparaciones-fotos-spark.mjs";
 import {HCB_PROJECT,HCB_STAND,HCB_ASSETS,HCB_INSPECTIONS,HCB_CASE,hcbAssetById,hcbImportPlan} from "../hot-cruji-bravo-caso.mjs";
+import {groupRepairs,bundleByItem,bundleStatus,bundleSummary,HCB_GROUP_ANCHOR} from "../reparaciones-agrupadas.mjs";
 const id="d630d5ec-4e3a-4d51-92b2-0d917f43ebc9";
 const user={uid:"u-01",email:"staff@example.test",name:"Staff de prueba"};
 const raw={project:"Hot Cruji Bravo",asset:"Stand principal",assetId:"",scope:"Elemento específico",
@@ -190,4 +191,50 @@ test("Solicitudes de reparación es el flujo principal, inventario permanece sec
  assert.match(js,/batch\.set\(requestRef\(id\),item\)/);
  assert.match(js,/batch\.set\(logRef\(\)/);
  assert.match(js,/importHotCrujiPhotoCase/);
+});
+
+test("Hot Cruji Bravo aparece como una sola solicitud general con conceptos independientes",()=>{
+ const fake=HCB_INSPECTIONS.map((t,i)=>({
+  id:t.id,project:"Hot Cruji Bravo",asset:"Stand Modo Bravo · Centro Santa Fe",
+  area:t.area,problem:t.problem,createdAt:{seconds:i+10},status:"pendiente",
+  priority:t.priority,photos:[],quotes:[]
+ }));
+ fake.push({id:HCB_GROUP_ANCHOR,project:"Hot Cruji Bravo",
+  asset:"Stand Modo Bravo · Centro Santa Fe",area:"Revisión de puerta",
+  problem:"Revisar herrajes",createdAt:{seconds:90},status:"revision",photos:[],quotes:[]});
+ fake.push({id:"e630d5ec-4e3a-4d51-92b2-0d917f43ebc9",project:"Otro proyecto",
+  asset:"Otro stand",area:"Gráfica",problem:"Desgaste",createdAt:{seconds:99},
+  status:"terminado",photos:[],quotes:[]});
+ const groups=groupRepairs(fake);
+ assert.equal(groups.length,2);
+ const combined=bundleByItem(fake,HCB_INSPECTIONS[1].id);
+ assert.ok(combined);
+ assert.equal(combined.id,HCB_GROUP_ANCHOR,"Conservar folio general de Hot Cruji");
+ assert.equal(combined.items.length,6);
+ assert.equal(combined.open,6);
+ assert.equal(combined.done,0);
+ assert.match(bundleStatus(combined),/6 pendientes/);
+ const summary=bundleSummary(combined,"https://example.org/solicitud-general");
+ for(const item of combined.items){
+  assert.ok(summary.includes(item.area));
+  assert.ok(summary.includes(item.id));
+ }
+ assert.match(summary,/Total de conceptos: 6/);
+ assert.match(summary,/Folio general:/);
+ assert.match(summary,/solicitud-general/);
+});
+test("Nuevas solicitudes aceptan varios arreglos con un solo flujo visible sin borrar documentos técnicos",()=>{
+ const base=fileURLToPath(new URL("../",import.meta.url));
+ const html=readFileSync(base+"reparaciones.html","utf8");
+ const js=readFileSync(base+"reparaciones.js","utf8");
+ assert.match(html,/id="addRepairItem"/);
+ assert.match(html,/id="additionalRepairs"/);
+ assert.match(js,/function addRepairLine/);
+ assert.match(js,/grouped=groupRepairs\(rows\)/);
+ assert.match(js,/batch\.set\(requestRef\(id\),record\)/);
+ assert.match(js,/activeRepairItemId=b\.dataset\.repairItem/);
+ assert.match(js,/bundleSummary\(group,link\(selected\)\)/);
+ assert.match(js,/group\.items\.map\(\(item,i\)/);
+ assert.match(js,/getDocFromServer\(requestRef\(id\)\)/);
+ assert.doesNotMatch(js,/deleteDoc\(|batch\.delete\(/);
 });
