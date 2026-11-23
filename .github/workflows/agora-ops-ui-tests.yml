@@ -50,6 +50,11 @@ jobs:
           node --check operaciones/jornadas-live.js
           node --check operaciones/control-jornadas.js
           node --check operaciones/visor-live.js
+      - name: Validar módulo de Inventario, Mantenimiento y Reparaciones
+        run: |
+          node --check operaciones/reparaciones.js
+          node --check operaciones/reparaciones-model.mjs
+          node --test operaciones/tests/qa-reparaciones.mjs
       - name: Validar app instalable y caché privada
         run: node operaciones/tests/qa-ops-pwa.mjs
       - name: Validar ventanas, geolocalización y traslados
