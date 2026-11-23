@@ -3,8 +3,9 @@ import {clean,safeUrl,makeRequest,makeQuote,summary,encodeCsv,STATUSES,ROUTES} f
 import {quoteFromInvite} from "./reparaciones-invitaciones-model.mjs";
 import {mountInvitations} from "./reparaciones-invitaciones-ui.mjs";
 import {compressSparkPhoto,photoRefId,photoMarker,sparkPhotoPayload} from "./reparaciones-fotos-spark.mjs";
+import {HCB_PROJECT,HCB_STAND,HCB_CASE,HCB_ASSETS,HCB_INSPECTIONS,hcbAssetById,hcbImportPlan} from "./hot-cruji-bravo-caso.mjs";
 import {GoogleAuthProvider,onAuthStateChanged,signInWithPopup,signInWithRedirect,signOut} from "https://www.gstatic.com/firebasejs/13.1.0/firebase-auth.js";
-import {collection,doc,query,where,limit,onSnapshot,getDocFromServer,serverTimestamp,writeBatch,runTransaction} from "https://www.gstatic.com/firebasejs/13.1.0/firebase-firestore.js";
+import {collection,doc,query,where,limit,onSnapshot,getDocFromServer,getDocsFromServer,serverTimestamp,writeBatch,runTransaction} from "https://www.gstatic.com/firebasejs/13.1.0/firebase-firestore.js";
 // Plan Spark: fotos comprimidas en documentos privados de Firestore. Sin Storage.
 const fb=window.AGORA_FIREBASE,auth=fb?.auth,db=fb?.firestore;
 const $=id=>document.getElementById(id),esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -351,6 +352,89 @@ function renderCatalog(){
  if(filtered.length>30){const p=document.createElement("p");p.className="muted";p.textContent="Mostrando 30 de "+filtered.length+" piezas. Usa el buscador para acotar.";box.append(p);}
  if(selectedAsset)showAsset(selectedAsset);
 }
+
+function renderHotCrujiPreview(){
+ const target=$("hcbPreview"),names=document.createElement("p"),list=document.createElement("ol");
+ names.textContent=HCB_CASE.overall+". Huella final por verificar. Sin fotos cargadas.";
+ for(const a of HCB_ASSETS){
+  const li=document.createElement("li");li.textContent=a.code+" · "+a.piece+" — "+a.description;list.append(li);
+ }
+ const heading=document.createElement("p");heading.textContent="Inspecciones por realizar, sin diagnóstico de daños:";
+ const tasks=document.createElement("ul");
+ for(const q of HCB_INSPECTIONS){const li=document.createElement("li");li.textContent=q.code+" · "+q.area;tasks.append(li);}
+ target.replaceChildren(names,list,heading,tasks);
+}
+renderHotCrujiPreview();
+function hcbAssetDoc(a){
+ return {id:a.id,project:HCB_PROJECT,stand:HCB_STAND,piece:a.piece,
+  description:a.code+" · "+a.description,materialLink:"",
+  condition:"Por revisar",photoPaths:[],createdBy:currentUser.uid,
+  createdAt:serverTimestamp(),updatedAt:serverTimestamp(),revision:1};
+}
+async function registerHotCrujiCase(){
+ if(!coordinator||!currentUser)throw Error("Solo coordinación puede registrar el expediente");
+ // Leer desde servidor antes de cada alta: jamás sobrescribir piezas del equipo.
+ const [assetSnapshot,requestSnapshot]=await Promise.all([
+  getDocsFromServer(query(collection(db,"agora_repair_assets"),where("project","==",HCB_PROJECT))),
+  getDocsFromServer(query(collection(db,COLL),where("project","==",HCB_PROJECT)))
+ ]);
+ const foundAssets=assetSnapshot.docs.map(d=>({...d.data(),id:d.id}));
+ const foundRequests=requestSnapshot.docs.map(d=>({...d.data(),id:d.id}));
+ const duplicates=new Set(foundAssets.map(x=>x.id));
+ const byPiece=new Map(foundAssets.filter(x=>x.stand===HCB_STAND).map(x=>[x.piece,x.id]));
+ const existingRequests=new Set(foundRequests.map(x=>x.id));
+ const alreadyInspected=new Set(foundRequests
+  .filter(x=>x.cause==="Inspección inicial de inventario · sin daño confirmado").map(x=>x.area));
+ const plan=hcbImportPlan([...duplicates], [...existingRequests]);
+ const toCreate=plan.assets.filter(x=>!byPiece.has(x.piece));
+ const inspections=plan.inspections.filter(x=>!alreadyInspected.has(x.area));
+ if(!toCreate.length&&!inspections.length){
+  $("hcbImportStatus").textContent="El caso ya está registrado. Se conservaron todas las piezas y revisiones existentes.";
+  $("assetSearch").value=HCB_PROJECT;renderCatalog();
+  return;
+ }
+ if(toCreate.length){
+  const batch=writeBatch(db);
+  for(const a of toCreate)batch.set(doc(db,"agora_repair_assets",a.id),hcbAssetDoc(a));
+  await batch.commit();
+ }
+ if(inspections.length){
+  const batch=writeBatch(db);
+  for(const task of inspections){
+   const related=hcbAssetById(task.assetId);
+   const actualAssetId=related?(byPiece.get(related.piece)||related.id):"";
+   const request=makeRequest({
+    project:HCB_PROJECT,asset:HCB_STAND,assetId:actualAssetId,
+    scope:"Elemento específico",area:task.area,
+    cause:"Inspección inicial de inventario · sin daño confirmado",
+    problem:task.problem,solutionMode:"propuesta",instructions:task.instructions,
+    materialLink:"",priority:task.priority,dueDate:""
+   },currentUser,task.id,serverTimestamp());
+   batch.set(requestRef(task.id),request);
+   batch.set(logRef(),{requestId:task.id,actorUid:currentUser.uid,
+     actorEmail:currentUser.email,action:"creada",
+     detail:task.code+" · Revisión documental inicial; daños sin confirmar",
+     createdAt:serverTimestamp()});
+  }
+  await batch.commit();
+ }
+ $("assetSearch").value=HCB_PROJECT;renderCatalog();
+ $("hcbImportStatus").textContent="Expediente registrado: "+toCreate.length+
+  " piezas nuevas y "+inspections.length+" inspecciones nuevas. No se duplicaron piezas existentes. Fotografías originales: 0 de 42 cargadas.";
+ feedback("Hot Cruji Bravo preparado en Firestore. Revisa cada pieza y adjunta evidencia real.");
+}
+$("hcbImport").onclick=async()=>{
+ const button=$("hcbImport");
+ button.disabled=true;
+ $("hcbImportStatus").textContent="Consultando el inventario existente y registrando solo los elementos faltantes...";
+ try{await registerHotCrujiCase();}
+ catch(error){
+  $("hcbImportStatus").textContent="No se completó el registro: "+error.message+
+   ". Reintentar es seguro: los registros ya creados se conservan.";
+  feedback("No se pudo completar Hot Cruji Bravo: "+error.message,true);
+ }finally{button.disabled=false;}
+};
+
 $("assetSearch").oninput=renderCatalog;
 $("assetPicker").onchange=()=>{
  const a=assets.find(x=>x.id===$("assetPicker").value);if(!a)return;
