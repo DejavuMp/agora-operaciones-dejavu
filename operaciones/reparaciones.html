@@ -43,6 +43,18 @@ hr{border:0;border-top:1px solid var(--line);margin:20px 0}.hide,[hidden]{displa
 .request-extra>p{margin:8px 0 0}
 .record:focus-visible{outline:3px solid #fd9ba1;outline-offset:2px}
 @media(max-width:530px){.request-overview{padding:16px}.steps-inline{gap:5px}.steps-inline span{font-size:11px}}
+
+.repair-line{background:#f7f8f8;border:1px solid var(--line);padding:13px;border-radius:10px;margin-top:12px}
+.repair-line-head{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.repair-line-head strong{font-size:13px}
+.repair-group-title{border-bottom:1px solid var(--line);margin-bottom:15px;padding-bottom:12px}
+.repair-group-title h2{margin-bottom:5px}
+.repair-items{display:grid;gap:8px;margin:10px 0 16px}
+.repair-item{display:flex;justify-content:space-between;align-items:center;gap:12px;width:100%;text-align:left;padding:10px 12px;border-radius:9px;border:1px solid var(--line);background:#f8f9f9}
+.repair-item.selected{border-color:var(--brand);box-shadow:inset 3px 0 var(--brand);background:white}
+.repair-item b{display:block;font-size:12px}
+.repair-item small{display:block;margin-top:4px;color:var(--muted);font-size:11px}
+.repair-section-label{font-size:12px;font-weight:700;margin:12px 0}
 </style></head>
 <body>
 <header><img src="./assets/dejavu-horizontal.png" alt="Dejavú Marketing"><div><strong>ÁGORA · Solicitudes de Reparación</strong><span>Reporta daños · Asigna responsables · Solicita cotizaciones · Da seguimiento</span></div><a href="./" class="button" style="background:transparent;color:#fff">Operaciones</a></header>
@@ -57,6 +69,9 @@ hr{border:0;border-top:1px solid var(--line);margin:20px 0}.hide,[hidden]{displa
 <div class="two"><label>Proyecto / activación *<input name="project" maxlength="120" placeholder="Hot Cruji Bravo" required></label><label>Stand / mueble *<input name="asset" maxlength="120" placeholder="Stand principal" required></label></div>
 <div class="two"><label>¿Qué se dañó?<select name="scope"><option>Elemento específico</option><option>Área del stand</option><option>Stand completo</option><option>Mueble suelto</option></select></label><label>Pieza o área *<input name="area" maxlength="120" placeholder="Mostrador frontal" required></label></div>
 <label>Problema / arreglo requerido *<textarea name="problem" required maxlength="2000" placeholder="Describe qué sucede y qué necesita atención"></textarea></label>
+<div id="additionalRepairs" aria-live="polite"></div>
+<button id="addRepairItem" type="button" class="button" style="margin-top:9px">+ Agregar otro arreglo a esta solicitud</button>
+<p class="form-help">Puedes agregar varias piezas o problemas: se mostrarán juntos en una sola solicitud general, con evidencia y avance por concepto.</p>
 <div class="two"><label>Prioridad<select name="priority"><option>Normal</option><option>Alta</option><option>Urgente</option></select></label><label>¿Para cuándo se requiere?<input name="dueDate" type="date"></label></div>
 <details class="request-extra"><summary>Agregar instrucciones, causa, materiales o vínculo con inventario (opcional)</summary>
 <label>Motivo o causa del daño<input name="cause" maxlength="250" placeholder="Montaje, traslado, desgaste..."></label>
@@ -67,7 +82,7 @@ hr{border:0;border-top:1px solid var(--line);margin:20px 0}.hide,[hidden]{displa
 <p class="form-help">Puedes solicitar un arreglo sin registrar inventario. Los datos complementarios se conservan dentro del folio.</p>
 </details>
 <button type="submit" class="red" id="submitRequest">Crear solicitud de reparación</button>
-<p class="form-help">Se generará un folio y podrás adjuntar fotos, asignar la reparación, solicitar cotizaciones y compartir el expediente.</p>
+<p class="form-help">Se creará una solicitud general con todos los arreglos que agregues. Cada concepto conservará evidencia, responsable y seguimiento.</p>
 </form>
 <details class="request-extra" data-coord hidden><summary>¿Tienes el ZIP de Hot Cruji Bravo? Registrar sus solicitudes con fotografías</summary>
 <p class="form-help">Carga opcional de siete reportes ya identificados y 42 fotografías desde el ZIP, sin abrir el inventario. Requiere tu cuenta de coordinación y no duplicará folios existentes.</p>
