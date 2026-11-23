@@ -57,7 +57,6 @@ export function bundleSummary(group,link=""){
    "   Fotos vinculadas: "+(r.photos?.length||0),
    "   Importe estimado: $"+Number(r.estimatedCost||0).toFixed(2)+" MXN",
    ...(r.quotes||[]).map(q=>"   Cotización: "+q.provider+" · $"+Number(q.amount).toFixed(2)+" MXN"+(q.id===r.selectedQuoteId?" · SELECCIONADA":"")),
-   "   Control técnico: "+r.id,
    ""
   );
  }
