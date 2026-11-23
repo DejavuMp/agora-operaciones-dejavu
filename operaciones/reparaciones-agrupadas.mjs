@@ -64,3 +64,17 @@ export function bundleSummary(group,link=""){
   "Enlace privado a la solicitud: "+link);
  return lines.join("\n");
 }
+
+export function bundledCsv(groups){
+ const cols=["folio_general","proyecto","stand","conceptos","pendientes","terminados","detalle"];
+ const protect=value=>{
+  let t=String(value??"");
+  if(/^[\s]*[=+@-]/.test(t))t="'"+t;
+  return '"'+t.replaceAll('"','""')+'"';
+ };
+ const data=groups.map(group=>[
+  group.id,group.project,group.asset,group.items.length,group.open,group.done,
+  group.items.map((item,i)=>(i+1)+". "+item.area+" ("+item.status+")").join("; ")
+ ]);
+ return "\ufeff"+[cols.join(","),...data.map(row=>row.map(protect).join(","))].join("\r\n");
+}
