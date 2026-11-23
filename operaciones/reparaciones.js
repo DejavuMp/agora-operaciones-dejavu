@@ -192,6 +192,128 @@ async function renderPhotos(record){
   }catch(_){anchor.replaceWith(document.createTextNode("Foto no disponible · "));}
  }
 }
+
+function renderEditPanel(group,r){
+ if(!coordinator||!editMode)return "";
+ const buttons='<div class="actions"><button type="submit" class="red">Guardar cambios</button><button type="button" id="cancelRepairEdit">Cancelar edición</button></div>';
+ if(editMode==="general"&&group){
+  return '<form id="editGeneralForm" class="repair-edit-form"><h3>Editar datos generales de la solicitud</h3>'+
+   '<p class="muted">Se actualizarán los datos comunes de todos los arreglos, sin cambiar sus fotos, estados, responsables ni cotizaciones.</p>'+
+   '<label>Proyecto *<input name="project" maxlength="120" required value="'+esc(group.project)+'"></label>'+
+   '<label>Stand / equipo *<input name="asset" maxlength="120" required value="'+esc(group.asset)+'"></label>'+
+   buttons+'</form>';
+ }
+ if(editMode==="concept"){
+  const scope=SCOPES.map(v=>'<option value="'+esc(v)+'" '+(v===r.scope?'selected':'')+'>'+esc(v)+'</option>').join("");
+  const priority=PRIORITIES.map(v=>'<option value="'+esc(v)+'" '+(v===r.priority?'selected':'')+'>'+esc(v)+'</option>').join("");
+  return '<form id="editConceptForm" class="repair-edit-form"><h3>Editar concepto de reparación</h3>'+
+   '<label>Pieza o área *<input name="area" required maxlength="120" value="'+esc(r.area)+'"></label>'+
+   '<label>Daño / trabajo requerido *<textarea name="problem" required maxlength="2000">'+esc(r.problem)+'</textarea></label>'+
+   '<div class="two"><label>Alcance<select name="scope">'+scope+'</select></label>'+
+   '<label>Prioridad<select name="priority">'+priority+'</select></label></div>'+
+   '<div class="two"><label>Fecha requerida<input type="date" name="dueDate" value="'+esc(r.dueDate)+'"></label>'+
+   '<label>Tipo de solución<select name="solutionMode"><option value="instrucciones" '+(r.solutionMode!=="propuesta"?'selected':'')+'>Trabajo definido</option><option value="propuesta" '+(r.solutionMode==="propuesta"?'selected':'')+'>Solicitar propuesta</option></select></label></div>'+
+   '<label>Causa del daño<input name="cause" maxlength="250" value="'+esc(r.cause)+'"></label>'+
+   '<label>Instrucciones<textarea name="instructions" maxlength="2000">'+esc(r.instructions)+'</textarea></label>'+
+   '<label>Materiales / planos HTTPS<input name="materialLink" type="url" maxlength="1000" value="'+esc(r.materialLink)+'"></label>'+
+   buttons+'</form>';
+ }
+ if(editMode==="new"&&group){
+  return '<form id="addConceptForm" class="repair-edit-form"><h3>Agregar arreglo a esta misma solicitud</h3>'+
+   '<p class="muted">Proyecto: '+esc(group.project)+' · Stand: '+esc(group.asset)+'. No se abrirá otra solicitud visible.</p>'+
+   '<label>Pieza o área *<input name="area" required maxlength="120" placeholder="Ej. Puerta de cabina"></label>'+
+   '<label>Daño o trabajo requerido *<textarea name="problem" required maxlength="2000" placeholder="Describe el arreglo"></textarea></label>'+
+   '<div class="two"><label>Prioridad<select name="priority"><option>Normal</option><option>Alta</option><option>Urgente</option></select></label>'+
+   '<label>Fecha requerida<input type="date" name="dueDate"></label></div>'+
+   '<div class="actions"><button type="submit" class="red">Agregar a esta solicitud</button><button type="button" id="cancelRepairEdit">Cancelar</button></div></form>';
+ }
+ return "";
+}
+function beginRepairEdit(mode,group,r){
+ if(!coordinator||!currentUser)return feedback("Necesitas la cuenta de coordinación para editar arreglos. Con acceso Staff puedes adjuntar evidencias y registrar avances.",true);
+ editMode=mode;
+ editConceptRevision=r.revision;
+ editGroupRevisions=new Map(group?.items.map(item=>[item.id,item.revision])||[]);
+ renderDetail(selected);
+ const first=$("editConceptForm")||$("editGeneralForm")||$("addConceptForm");
+ first?.querySelector("input,textarea")?.focus();
+}
+async function saveConceptEdit(r,formEl){
+ if(!coordinator||!currentUser)throw Error("Solo coordinación puede editar esta solicitud.");
+ const patch=repairEditPatch(Object.fromEntries(new FormData(formEl).entries()));
+ await update(r.id,"edición de arreglo","Datos del concepto "+r.area+" corregidos",old=>{
+  checkEditRevision(old,editConceptRevision);
+  return patch;
+ });
+ editMode="";
+ feedback("Arreglo actualizado en Firebase. Se conservaron sus fotos, cotizaciones y movimientos.");
+}
+async function saveGroupEdit(group,formEl){
+ if(!coordinator||!currentUser)throw Error("Solo coordinación puede editar los datos generales.");
+ if(group.items.length>180)throw Error("Hay demasiados conceptos para editar en una sola operación.");
+ const patch=repairGroupPatch(Object.fromEntries(new FormData(formEl).entries()));
+ await runTransaction(db,async tx=>{
+  const refs=group.items.map(item=>requestRef(item.id));
+  const snaps=await Promise.all(refs.map(ref=>tx.get(ref)));
+  for(let i=0;i<snaps.length;i++){
+   if(!snaps[i].exists())throw Error("Falta uno de los arreglos; abre de nuevo la solicitud.");
+   checkEditRevision(snaps[i].data(),editGroupRevisions.get(group.items[i].id));
+  }
+  for(let i=0;i<snaps.length;i++){
+   const item=group.items[i],old=snaps[i].data();
+   tx.update(refs[i],{...patch,revision:old.revision+1,updatedAt:serverTimestamp()});
+   tx.set(logRef(),{requestId:item.id,actorUid:currentUser.uid,actorEmail:currentUser.email,
+    action:"edición general",detail:"Proyecto/stand actualizados: "+patch.project+" / "+patch.asset,
+    createdAt:serverTimestamp()});
+  }
+ });
+ editMode="";
+ feedback("Datos generales actualizados en todos los arreglos; historial y fotos conservados.");
+}
+async function addConceptToGroup(group,formEl){
+ if(!coordinator||!currentUser)throw Error("Solo coordinación puede agregar arreglos desde esta solicitud.");
+ const data=Object.fromEntries(new FormData(formEl).entries());
+ const patch=repairEditPatch({...data,scope:"Elemento específico",solutionMode:"propuesta"});
+ const id=crypto.randomUUID();
+ const record=makeRequest({...patch,project:group.project,asset:group.asset},
+  currentUser,id,serverTimestamp());
+ const batch=writeBatch(db);
+ batch.set(requestRef(id),record);
+ batch.set(logRef(),{requestId:id,actorUid:currentUser.uid,actorEmail:currentUser.email,
+  action:"creada",detail:"Concepto agregado a la solicitud general "+group.id,
+  createdAt:serverTimestamp()});
+ await batch.commit();
+ editMode="";
+ const snap=await getDocFromServer(requestRef(id));
+ if(snap.exists()){
+  rows=[...rows.filter(x=>x.id!==id),{...snap.data(),id}];
+  grouped=groupRepairs(rows);
+ }
+ activeRepairItemId=id;
+ renderList();
+ renderDetail(selected);
+ feedback("Nuevo arreglo añadido a la solicitud general. Ya puedes adjuntar fotografías y asignarlo.");
+}
+function bindRepairEditActions(group,r){
+ if($("editGeneralButton"))$("editGeneralButton").onclick=()=>beginRepairEdit("general",group,r);
+ if($("editConceptButton"))$("editConceptButton").onclick=()=>beginRepairEdit("concept",group,r);
+ if($("cancelRepairEdit"))$("cancelRepairEdit").onclick=()=>{editMode="";renderDetail(selected);};
+ for(const [id,save] of [
+  ["editGeneralForm",el=>saveGroupEdit(group,el)],
+  ["editConceptForm",el=>saveConceptEdit(r,el)],
+  ["addConceptForm",el=>addConceptToGroup(group,el)]
+ ]){
+  const formEl=$(id);if(!formEl)continue;
+  formEl.onsubmit=async e=>{
+   e.preventDefault();const btn=formEl.querySelector('[type="submit"]');
+   if(btn)btn.disabled=true;
+   try{await save(formEl);}catch(error){
+    feedback("No se guardaron los cambios: "+(error?.message||error),true);
+   }finally{if(btn?.isConnected)btn.disabled=false;}
+  };
+ }
+}
+
 function renderDetail(id){
  if(unsubInvites){unsubInvites();unsubInvites=null;}
  const group=bundleByItem(rows,id);
