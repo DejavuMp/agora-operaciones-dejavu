@@ -35,8 +35,8 @@ async function start(user){
   $("who").textContent=currentUser.name+" · "+(coordinator?"Coordinación":"Staff");
   document.querySelectorAll("[data-coord]").forEach(el=>el.hidden=!coordinator);
   $("gate").hidden=true;$("workspace").hidden=false;
-  listenCatalog(token);
-  if(coordinator)listenMembers(token);
+  // Solicitudes primero: el catálogo solo se consulta cuando existe permiso de coordinación.
+  if(coordinator){listenCatalog(token);listenMembers(token);}
   else unsubAssigned=onSnapshot(query(collection(db,COLL),where("assignedUid","==",user.uid),limit(150)),s=>{
    if(token!==session||s.metadata.fromCache)return;
    assignedRows=s.docs.map(d=>({...d.data(),id:d.id}));refreshRequests();
@@ -63,7 +63,8 @@ form.onsubmit=async e=>{
   const batch=writeBatch(db);
   batch.set(requestRef(id),item);
   batch.set(logRef(),{requestId:id,actorUid:currentUser.uid,actorEmail:currentUser.email,action:"creada",detail:"Nueva solicitud",createdAt:serverTimestamp()});
-  await batch.commit();form.reset();select(id);feedback("Solicitud guardada. Folio: "+id+". Ahora puedes subir las fotos.");
+  await batch.commit();form.reset();select(id);feedback("Solicitud de reparación guardada. Folio: "+id+". Adjunta evidencia y continúa con la asignación o cotización.");
+  if(window.matchMedia("(max-width: 900px)").matches)$("repairQueue").scrollIntoView({behavior:"smooth",block:"start"});
  }catch(ex){feedback("No se pudo guardar en Firebase: "+ex.message,true);}finally{btn.disabled=false;}
 };
 function renderList(){
