@@ -53,6 +53,8 @@ jobs:
         run: npx firebase emulators:exec --only firestore --project demo-agora-ops --non-interactive 'node .github/firebase-staff/test-ops-rules.mjs'
       - name: Verificar horarios, jornadas, GPS y límites de horas
         run: npx firebase emulators:exec --only firestore --project demo-agora-jornadas --non-interactive 'node .github/firebase-staff/test-clock-rules.mjs'
+      - name: Verificar creación completa de Hot Cruji Bravo sin acceder a producción
+        run: npx firebase emulators:exec --only firestore --project demo-agora-ops --non-interactive 'node operaciones/tests/qa-hcb-firestore.mjs'
 
   publish:
     name: "Publicar sitio independiente solo después de pruebas"
