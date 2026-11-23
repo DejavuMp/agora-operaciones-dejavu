@@ -6,7 +6,7 @@ export function createInviteToken(bytes){
  if(!(bytes instanceof Uint8Array)||bytes.length!==32)throw Error("Se requieren 32 bytes aleatorios seguros");
  return btoa(String.fromCharCode(...bytes)).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/g,"");
 }
-export function publicRequestSnapshot(request){
+export function publicRequestSnapshot(request,photoPreview=""){
  return {
   project:clean(request.project,120),
   asset:clean(request.asset,120),
@@ -15,12 +15,13 @@ export function publicRequestSnapshot(request){
   scope:clean(request.scope,60),
   priority:clean(request.priority,10),
   dueDate:clean(request.dueDate,10),
-  materialLink:safeUrl(request.materialLink)
+  materialLink:safeUrl(request.materialLink),
+  photoPreview:typeof photoPreview==="string"&&photoPreview.startsWith("data:image/jpeg;base64,")&&photoPreview.length<=150000?photoPreview:""
  };
 }
-export function invitePayload(request,createdBy,supplierHint,createdAt,expiresAt){
+export function invitePayload(request,createdBy,supplierHint,createdAt,expiresAt,photoPreview=""){
  if(!request?.id||!createdBy)throw Error("Solicitud y responsable obligatorios");
- return {requestId:request.id,snapshot:publicRequestSnapshot(request),
+ return {requestId:request.id,snapshot:publicRequestSnapshot(request,photoPreview),
   supplierHint:clean(supplierHint,160),createdBy,createdAt,expiresAt,
   updatedAt:createdAt,status:"pending",response:null,submittedAt:null};
 }
