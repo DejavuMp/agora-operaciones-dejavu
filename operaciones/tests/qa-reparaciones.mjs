@@ -4,6 +4,7 @@ import {readFileSync} from "node:fs";
 import {fileURLToPath} from "node:url";
 import {makeRequest,makeQuote,safeUrl,summary,encodeCsv,ROUTES,STATUSES} from "../reparaciones-model.mjs";
 import {createInviteToken,invitePayload,supplierResponse,quoteFromInvite,supplierInviteUrl,TOKEN_PATTERN} from "../reparaciones-invitaciones-model.mjs";
+import {photoRefId,photoMarker,validatePhotoData,sparkPhotoPayload,MAX_PHOTO_CHARS} from "../reparaciones-fotos-spark.mjs";
 const id="d630d5ec-4e3a-4d51-92b2-0d917f43ebc9";
 const user={uid:"u-01",email:"staff@example.test",name:"Staff de prueba"};
 const raw={project:"Hot Cruji Bravo",asset:"Stand principal",assetId:"",scope:"Elemento específico",
@@ -97,4 +98,30 @@ test("vista previa de foto está restringida a JPEG compartido",()=>{
  const invalid=invitePayload({id,project:"Stand",asset:"Panel",area:"Frente",problem:"Daño visible"},
   "coordinator","Proveedor","fecha","expiry","data:text/html;base64,AAAA");
  assert.equal(invalid.snapshot.photoPreview,"");
+});
+
+test("Spark: guardado por fotografía y sin Cloud Storage",()=>{
+ const imageId="b630d5ec-4e3a-4d51-92b2-0d917f43ebc9";
+ const marker=photoMarker(imageId);
+ assert.equal(photoRefId(marker),imageId);
+ assert.equal(photoRefId("agora-repairs/"+id+"/x/imagen.jpg"),null);
+ assert.equal(photoRefId("firestore:../../otro"),null);
+ const dataUrl="data:image/jpeg;base64,/9j/2Q==";
+ const d=sparkPhotoPayload({id:imageId,kind:"request",ownerId:id,
+  uploadedBy:user.uid,dataUrl,label:"Daño del panel",stage:"antes",createdAt:"servidor"});
+ assert.equal(d.dataUrl,dataUrl);
+ assert.equal(d.ownerId,id);
+ assert.equal(d.stage,"antes");
+ assert.throws(()=>validatePhotoData("data:text/html;base64,AAAA"),/JPEG/);
+ assert.throws(()=>validatePhotoData("data:image/jpeg;base64,"+"A".repeat(MAX_PHOTO_CHARS)),/límite/);
+});
+test("El frontend Spark no depende de APIs de Storage o facturación",()=>{
+ const base=fileURLToPath(new URL("../",import.meta.url));
+ const ui=readFileSync(base+"reparaciones.js","utf8");
+ const invite=readFileSync(base+"reparaciones-invitaciones-ui.mjs","utf8");
+ assert.doesNotMatch(ui,/getStorage\(|getBlob\(|uploadBytes\(/);
+ assert.doesNotMatch(invite,/getStorage\(|getBlob\(/);
+ assert.match(ui,/agora_repair_photos/);
+ assert.match(ui,/compressSparkPhoto/);
+ assert.match(ui,/runTransaction/);
 });
