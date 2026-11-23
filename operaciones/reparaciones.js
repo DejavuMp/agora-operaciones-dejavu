@@ -72,6 +72,13 @@ $("filter").oninput=renderList;
 function select(id){
  selected=id;const u=new URL(location.href);u.searchParams.set("solicitud",id);history.replaceState({}, "",u.href);
  renderList();renderDetail(id);
+ if(!rows.some(x=>x.id===id) && /^[a-f0-9-]{36}$/.test(id)){
+  getDocFromServer(requestRef(id)).then(snap=>{
+   if(selected!==id||!snap.exists())return;
+   rows=[...rows.filter(x=>x.id!==id),{...snap.data(),id}];
+   renderList();renderDetail(id);
+  }).catch(()=>feedback("Este folio no está disponible para tu cuenta.",true));
+ }
 }
 function qr(){
  const el=$("qr");if(!el)return;el.replaceChildren();const url=link(selected);
@@ -101,7 +108,7 @@ function renderDetail(id){
  ${detailRow("Requerido",r.dueDate)}${detailRow("Prioridad",r.priority)}${detailRow("Reportó",r.createdByName)}
  ${detailRow("Ruta",r.repairRoute)}${detailRow("Responsable",r.assignedTo)}${detailRow("Coordinación",r.decisionBy)}${detailRow("Notas",r.decisionNote)}</dl>
  ${safeUrl(r.materialLink)?`<p><a href="${esc(safeUrl(r.materialLink))}" target="_blank" rel="noopener noreferrer">Abrir materiales / planos</a></p>`:""}
- <div class="actions"><button id="copy">Copiar ficha</button><button id="email">Correo</button><button id="pdf">PDF</button><button id="png">Imagen PNG</button><button id="copyLink">Copiar enlace</button></div>
+ <div class="actions"><button id="copy">Copiar ficha</button><button id="email">Correo</button><button id="whatsapp">WhatsApp</button><button id="pdf">PDF</button><button id="png">Imagen PNG</button><button id="copyLink">Copiar enlace</button></div>
  <div class="two" style="align-items:start"><div><h3 style="font-size:14px">Enlace y QR privado</h3><div id="qr"></div><p class="form-help">Requiere una cuenta con permisos para abrir el expediente. No compartir con acceso anónimo.</p></div>
  <div><h3 style="font-size:14px">Evidencias</h3><div id="photos" class="photos"></div><label>Adjuntar fotografías JPEG/PNG<input id="photoFiles" type="file" multiple accept="image/*"></label><button id="uploadPhotos">Guardar fotografías</button><p class="form-help">Máximo 12 evidencias por folio, 5 MB por imagen guardada.</p></div></div>
  <hr><h3 style="font-size:15px">Cotizaciones</h3>${quotes}
@@ -118,6 +125,7 @@ function renderDetail(id){
  $("copy").onclick=()=>copy(summary(r,link(r.id)));
  $("copyLink").onclick=()=>copy(link(r.id));
  $("email").onclick=()=>{location.href="mailto:?subject="+encodeURIComponent("ÁGORA · Reparación "+r.asset+" · "+r.id.slice(0,8))+"&body="+encodeURIComponent(summary(r,link(r.id)).slice(0,4500));};
+ $("whatsapp").onclick=()=>window.open("https://wa.me/?text="+encodeURIComponent(summary(r,link(r.id)).slice(0,3500)),"_blank","noopener,noreferrer");
  $("pdf").onclick=()=>makePdf(r);
  $("png").onclick=()=>makePng(r);
  $("uploadPhotos").onclick=()=>uploadPhotos(r);
@@ -211,7 +219,12 @@ function makePdf(r){
  try{const p=new lib({unit:"mm",format:"a4"}),txt=summary(r,link(r.id)),lines=p.splitTextToSize(txt,175);let y=22;
  p.setFontSize(13);p.setFont("helvetica","bold");p.text("DEJAVÚ · SOLICITUD DE REPARACIÓN",18,y);p.setFont("helvetica","normal");p.setFontSize(9);y+=12;
  for(const line of lines){if(y>270){p.addPage();y=20;}p.text(line,18,y);y+=5;}
- const qr=qrCanvas();if(qr){if(y>230){p.addPage();y=20;}p.addImage(qr.toDataURL("image/png"),"PNG",18,y+4,29,29);}
+ if(y>220){p.addPage();y=20;}
+ p.setFillColor(24,27,32);p.roundedRect(18,y+3,92,11,2,2,"F");
+ p.setTextColor(255,255,255);p.setFontSize(10);
+ p.textWithLink("ABRIR SOLICITUD PRIVADA",22,y+10,{url:link(r.id)});
+ p.setTextColor(32,35,40);
+ const qr=qrCanvas();if(qr)p.addImage(qr.toDataURL("image/png"),"PNG",18,y+18,29,29);
  p.save("agora-reparacion-"+r.id.slice(0,8)+".pdf");
  }catch(e){feedback("No se pudo generar PDF: "+e.message,true);}
 }
