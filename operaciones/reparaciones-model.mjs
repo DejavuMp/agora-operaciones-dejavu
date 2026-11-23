@@ -11,7 +11,7 @@ export function safeUrl(value){
 export function makeRequest(raw,user,id,stamp){
  if(!/^[a-f0-9-]{36}$/.test(id))throw Error("Folio no válido");
  const r={
-  id,project:clean(raw.project,120),asset:clean(raw.asset,120),
+  id,assetId:clean(raw.assetId,36),project:clean(raw.project,120),asset:clean(raw.asset,120),
   scope:SCOPES.includes(raw.scope)?raw.scope:SCOPES[1],area:clean(raw.area,120),
   cause:clean(raw.cause,250),problem:clean(raw.problem,2000),
   solutionMode:raw.solutionMode==="propuesta"?"propuesta":"instrucciones",
@@ -37,7 +37,7 @@ export function summary(r,link=""){
  const quote=(r.quotes||[]).map((q,i)=>`${i+1}. ${q.provider}: $${Number(q.amount).toFixed(2)} MXN · ${q.scope||"Sin alcance"}${q.id===r.selectedQuoteId?" · SELECCIONADA":""}${q.link?" · "+q.link:""}`).join("\n")||"Pendientes";
  return [
  "ÁGORA DEJAVÚ · SOLICITUD DE REPARACIÓN",
- "Folio: "+r.id,"Proyecto: "+r.project,"Elemento: "+r.asset+" / "+r.area,
+ "Folio: "+r.id,"Proyecto: "+r.project,"Elemento: "+r.asset+" / "+r.area,"ID inventario: "+(r.assetId||"No vinculado"),
  "Alcance: "+r.scope,"Motivo: "+(r.cause||"Sin especificar"),
  "Problema: "+r.problem,"Trabajo / propuesta: "+(r.solutionMode==="propuesta"?"Solicitar propuesta":r.instructions),
  "Materiales: "+(r.materialLink||"Sin enlace"),"Necesario para: "+(r.dueDate||"Sin fecha"),
