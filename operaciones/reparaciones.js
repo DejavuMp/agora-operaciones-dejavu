@@ -5,18 +5,19 @@ import {mountInvitations} from "./reparaciones-invitaciones-ui.mjs";
 import {compressSparkPhoto,photoRefId,photoMarker,sparkPhotoPayload} from "./reparaciones-fotos-spark.mjs";
 import {HCB_PROJECT,HCB_STAND,HCB_CASE,HCB_ASSETS,HCB_INSPECTIONS,hcbAssetById,hcbImportPlan} from "./hot-cruji-bravo-caso.mjs";
 import {importHotCrujiPhotoCase} from "./hot-cruji-bravo-importar.mjs";
+import {groupRepairs,bundleByItem,bundleStatus,bundleSummary} from "./reparaciones-agrupadas.mjs";
 import {GoogleAuthProvider,onAuthStateChanged,signInWithPopup,signInWithRedirect,signOut} from "https://www.gstatic.com/firebasejs/13.1.0/firebase-auth.js";
 import {collection,doc,query,where,limit,onSnapshot,getDocFromServer,getDocsFromServer,serverTimestamp,writeBatch,runTransaction} from "https://www.gstatic.com/firebasejs/13.1.0/firebase-firestore.js";
 // Plan Spark: fotos comprimidas en documentos privados de Firestore. Sin Storage.
 const fb=window.AGORA_FIREBASE,auth=fb?.auth,db=fb?.firestore;
 const $=id=>document.getElementById(id),esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const COLL="agora_repair_requests",EVENTS="agora_repair_events";
-let currentUser=null,coordinator=false,rows=[],ownedRows=[],assignedRows=[],staffMembers=[],assets=[],selected="",selectedAsset="",unsub=null,unsubAssigned=null,unsubMembers=null,unsubEvents=null,unsubAssets=null,unsubInvites=null,session=0;
+let currentUser=null,coordinator=false,rows=[],grouped=[],activeRepairItemId="",ownedRows=[],assignedRows=[],staffMembers=[],assets=[],selected="",selectedAsset="",unsub=null,unsubAssigned=null,unsubMembers=null,unsubEvents=null,unsubAssets=null,unsubInvites=null,session=0;
 function feedback(message,error=false){$("message").textContent=message;$("message").className=error?"error":"ok";}
 function gate(text,canLogin=true){$("workspace").hidden=true;$("gate").hidden=false;$("gateText").textContent=text;$("login").hidden=!canLogin;}
 const requestRef=id=>doc(db,COLL,id),logRef=()=>doc(collection(db,EVENTS));
 const link=id=>{const u=new URL("./reparaciones.html",location.href);u.searchParams.set("solicitud",id);return u.href;};
-function reset(){session++;if(unsub){unsub();unsub=null;}if(unsubEvents){unsubEvents();unsubEvents=null;}if(unsubAssets){unsubAssets();unsubAssets=null;}if(unsubInvites){unsubInvites();unsubInvites=null;}if(unsubAssigned){unsubAssigned();unsubAssigned=null;}if(unsubMembers){unsubMembers();unsubMembers=null;}rows=[];ownedRows=[];assignedRows=[];staffMembers=[];assets=[];selected="";selectedAsset="";currentUser=null;coordinator=false;$("detail").textContent="";$("records").textContent="";}
+function reset(){session++;if(unsub){unsub();unsub=null;}if(unsubEvents){unsubEvents();unsubEvents=null;}if(unsubAssets){unsubAssets();unsubAssets=null;}if(unsubInvites){unsubInvites();unsubInvites=null;}if(unsubAssigned){unsubAssigned();unsubAssigned=null;}if(unsubMembers){unsubMembers();unsubMembers=null;}rows=[];grouped=[];activeRepairItemId="";ownedRows=[];assignedRows=[];staffMembers=[];assets=[];selected="";selectedAsset="";currentUser=null;coordinator=false;$("detail").textContent="";$("records").textContent="";}
 async function start(user){
  reset();if(!user){gate("Inicia sesión con tu cuenta vinculada a ÁGORA.");return;}
  if(!user.emailVerified){gate("Verifica tu correo de Google antes de ingresar.",false);return;}
@@ -54,36 +55,78 @@ $("logout").onclick=()=>signOut(auth);
 if(auth&&db)onAuthStateChanged(auth,start,e=>gate("Error de autenticación: "+e.message,false));
 else gate("Firebase no está disponible. No se permite guardar localmente.",false);
 const form=$("requestForm");
+let extraRepairCounter=0;
+function addRepairLine(){
+ const target=$("additionalRepairs");
+ if(target.children.length>=14){feedback("Puedes incluir hasta 15 arreglos en esta solicitud.",true);return;}
+ extraRepairCounter++;
+ const row=document.createElement("div");
+ row.className="repair-line";
+ row.innerHTML='<div class="repair-line-head"><strong>Arreglo adicional '+(target.children.length+2)+'</strong><button type="button" class="remove-repair" aria-label="Quitar arreglo">Quitar</button></div>'+
+ '<label>Pieza o área *<input name="repairArea" maxlength="120" required placeholder="Ej. Panel lateral"></label>'+
+ '<label>Descripción del daño *<textarea name="repairProblem" maxlength="2000" required placeholder="Describe qué necesita reparación"></textarea></label>';
+ row.querySelector(".remove-repair").onclick=()=>{row.remove();renumberRepairs();};
+ target.append(row);
+ row.querySelector("input").focus();
+}
+function renumberRepairs(){
+ [...$("additionalRepairs").children].forEach((row,i)=>{
+  row.querySelector("strong").textContent="Arreglo adicional "+(i+2);
+ });
+}
+$("addRepairItem").onclick=addRepairLine;
 form.onsubmit=async e=>{
  e.preventDefault();if(!currentUser)return feedback("Debes iniciar sesión.",true);
  const btn=$("submitRequest");btn.disabled=true;
  try{
-  const id=crypto.randomUUID(),raw=Object.fromEntries(new FormData(form).entries());
-  const item=makeRequest(raw,currentUser,id,serverTimestamp());
-  const batch=writeBatch(db);
-  batch.set(requestRef(id),item);
-  batch.set(logRef(),{requestId:id,actorUid:currentUser.uid,actorEmail:currentUser.email,action:"creada",detail:"Nueva solicitud",createdAt:serverTimestamp()});
-  await batch.commit();form.reset();select(id);feedback("Solicitud de reparación guardada. Folio: "+id+". Adjunta evidencia y continúa con la asignación o cotización.");
+  const raw=Object.fromEntries(new FormData(form).entries());
+  const extra=[...$("additionalRepairs").querySelectorAll(".repair-line")].map(row=>({
+   area:row.querySelector('[name="repairArea"]').value.trim(),
+   problem:row.querySelector('[name="repairProblem"]').value.trim()
+  }));
+  if(extra.some(x=>!x.area||!x.problem))throw Error("Completa la pieza y el daño de cada arreglo");
+  const requested=[{area:raw.area,problem:raw.problem},...extra];
+  if(requested.length>15)throw Error("Máximo 15 arreglos por solicitud general");
+  const batch=writeBatch(db),ids=[];
+  for(const item of requested){
+   const id=crypto.randomUUID();
+   const record=makeRequest({...raw,area:item.area,problem:item.problem},currentUser,id,serverTimestamp());
+   batch.set(requestRef(id),record);
+   batch.set(logRef(),{requestId:id,actorUid:currentUser.uid,actorEmail:currentUser.email,
+    action:"creada",detail:"Concepto de solicitud general · "+item.area,createdAt:serverTimestamp()});
+   ids.push(id);
+  }
+  await batch.commit();
+  form.reset();$("additionalRepairs").replaceChildren();
+  select(ids[0]);
+  feedback("Solicitud general guardada con "+ids.length+" arreglo"+(ids.length===1?"":"s")+
+   ". Puedes gestionar cada concepto sin crear solicitudes separadas en la pantalla.");
   if(window.matchMedia("(max-width: 900px)").matches)$("repairQueue").scrollIntoView({behavior:"smooth",block:"start"});
  }catch(ex){feedback("No se pudo guardar en Firebase: "+ex.message,true);}finally{btn.disabled=false;}
 };
 function renderList(){
  const term=$("filter").value.trim().toLowerCase();
  const status=$("statusFilter").value;
- const filtered=rows.filter(r=>[r.id,r.project,r.asset,r.area,r.status].join(" ").toLowerCase().includes(term)&&(!status||r.status===status));
+ const filtered=grouped.filter(g=>
+  [g.id,g.project,g.asset,...g.items.flatMap(r=>[r.id,r.area,r.problem,r.status])]
+    .join(" ").toLowerCase().includes(term) &&
+  (!status||g.items.some(r=>r.status===status)));
  const pending=rows.filter(r=>["pendiente","revision","cotizando"].includes(r.status)).length;
  const working=rows.filter(r=>["autorizado","reparacion"].includes(r.status)).length;
  const done=rows.filter(r=>["terminado","entregado"].includes(r.status)).length;
- $("repairMetrics").textContent=pending+" por decidir o cotizar · "+working+" en proceso · "+done+" terminadas o entregadas";
- $("records").innerHTML=filtered.map(r=>`<button class="record ${r.id===selected?"selected":""}" data-record="${esc(r.id)}">
-  <b>${esc(r.asset)} · ${esc(r.area)}</b><span class="status">${esc(r.status)}</span>
-  <small>${esc(r.project)} · ${esc(r.priority)} · Folio ${esc(r.id.slice(0,8))}</small></button>`).join("")||'<p class="muted">No hay solicitudes con este filtro.</p>';
+ $("repairMetrics").textContent=grouped.length+" solicitudes generales · "+pending+
+   " conceptos por decidir o cotizar · "+working+" en proceso · "+done+" terminados";
+ $("records").innerHTML=filtered.map(g=>`<button class="record ${g.items.some(r=>r.id===selected)?"selected":""}" data-record="${esc(g.id)}">
+  <b>${esc(g.project)} · ${esc(g.asset)}</b><span class="status">${esc(bundleStatus(g))}</span>
+  <small>${g.items.length} arreglo${g.items.length===1?"":"s"} · Folio general ${esc(g.id.slice(0,8))}</small></button>`).join("")||
+ '<p class="muted">No hay solicitudes con este filtro.</p>';
  $("records").querySelectorAll("[data-record]").forEach(b=>b.onclick=()=>select(b.dataset.record));
 }
 function refreshRequests(){
  const merged=new Map([...ownedRows,...assignedRows].map(r=>[r.id,r]));
  rows=[...merged.values()].sort((a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
- $("total").textContent="("+rows.length+")";
+ grouped=groupRepairs(rows);
+ $("total").textContent="("+grouped.length+")";
  renderList();
  if(selected)renderDetail(selected);
  else if(new URLSearchParams(location.search).get("solicitud"))select(new URLSearchParams(location.search).get("solicitud"));
@@ -99,13 +142,21 @@ function listenMembers(token){
 $("filter").oninput=renderList;
 $("statusFilter").onchange=renderList;
 function select(id){
- selected=id;const u=new URL(location.href);u.searchParams.set("solicitud",id);history.replaceState({}, "",u.href);
- renderList();renderDetail(id);
- if(!rows.some(x=>x.id===id) && /^[a-f0-9-]{36}$/.test(id)){
+ const group=bundleByItem(rows,id);
+ selected=group?.id||id;
+ activeRepairItemId=id;
+ const u=new URL(location.href);u.searchParams.set("solicitud",selected);history.replaceState({},"",u.href);
+ renderList();renderDetail(selected);
+ if(!group && /^[a-f0-9-]{36}$/.test(id)){
   getDocFromServer(requestRef(id)).then(snap=>{
-   if(selected!==id||!snap.exists())return;
+   if(activeRepairItemId!==id||!snap.exists())return;
    rows=[...rows.filter(x=>x.id!==id),{...snap.data(),id}];
-   renderList();renderDetail(id);
+   grouped=groupRepairs(rows);
+   const found=bundleByItem(rows,id);
+   selected=found?.id||id;
+   const target=new URL(location.href);target.searchParams.set("solicitud",selected);
+   history.replaceState({},"",target.href);
+   renderList();renderDetail(selected);
   }).catch(()=>feedback("Este folio no está disponible para tu cuenta.",true));
  }
 }
@@ -133,7 +184,7 @@ async function renderPhotos(record){
   anchor.rel="noopener noreferrer";anchor.target="_blank";anchor.append(img);parent.append(anchor);
   try{
    const data=await getSparkPhoto(item.path);
-   if(selected!==record.id)return;
+   if(activeRepairItemId!==record.id)return;
    img.src=data;anchor.href=data;anchor.download=(item.label||"evidencia")+".jpg";
   }catch(_){anchor.replaceWith(document.createTextNode("Foto no disponible · "));}
  }
@@ -289,7 +340,7 @@ async function loadHistory(r){
  const q=coordinator?query(collection(db,EVENTS),where("requestId","==",r.id),limit(100)):
    query(collection(db,EVENTS),where("actorUid","==",currentUser.uid),limit(150));
  unsubEvents=onSnapshot(q,snap=>{
-  if(selected!==r.id)return;
+  if(activeRepairItemId!==r.id)return;
   const el=$("history");if(!el)return;
   const log=snap.docs.map(d=>d.data()).filter(x=>x.requestId===r.id).sort((a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
   el.innerHTML=log.map(x=>`<li>${esc(x.createdAt?.toDate?.().toLocaleString("es-MX")||"Guardado")} · ${esc(x.action)} · ${esc(x.actorEmail)} · ${esc(x.detail)}</li>`).join("")||"<li>Sin movimientos registrados</li>";
