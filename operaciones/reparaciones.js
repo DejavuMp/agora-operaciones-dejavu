@@ -6,12 +6,12 @@ import {getStorage,ref as storageRef,uploadBytes,getBlob} from "https://www.gsta
 const fb=window.AGORA_FIREBASE,auth=fb?.auth,db=fb?.firestore,storage=fb?.app?getStorage(fb.app):null;
 const $=id=>document.getElementById(id),esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const COLL="agora_repair_requests",EVENTS="agora_repair_events";
-let currentUser=null,coordinator=false,rows=[],selected="",unsub=null,unsubEvents=null,session=0;
+let currentUser=null,coordinator=false,rows=[],assets=[],selected="",selectedAsset="",unsub=null,unsubEvents=null,unsubAssets=null,session=0;
 function feedback(message,error=false){$("message").textContent=message;$("message").className=error?"error":"ok";}
 function gate(text,canLogin=true){$("workspace").hidden=true;$("gate").hidden=false;$("gateText").textContent=text;$("login").hidden=!canLogin;}
 const requestRef=id=>doc(db,COLL,id),logRef=()=>doc(collection(db,EVENTS));
 const link=id=>{const u=new URL("./reparaciones.html",location.href);u.searchParams.set("solicitud",id);return u.href;};
-function reset(){session++;if(unsub){unsub();unsub=null;}if(unsubEvents){unsubEvents();unsubEvents=null;}rows=[];selected="";currentUser=null;coordinator=false;$("detail").textContent="";$("records").textContent="";}
+function reset(){session++;if(unsub){unsub();unsub=null;}if(unsubEvents){unsubEvents();unsubEvents=null;}if(unsubAssets){unsubAssets();unsubAssets=null;}rows=[];assets=[];selected="";selectedAsset="";currentUser=null;coordinator=false;$("detail").textContent="";$("records").textContent="";}
 async function start(user){
  reset();if(!user){gate("Inicia sesión con tu cuenta vinculada a ÁGORA.");return;}
  if(!user.emailVerified){gate("Verifica tu correo de Google antes de ingresar.",false);return;}
@@ -30,6 +30,7 @@ async function start(user){
   $("who").textContent=currentUser.name+" · "+(coordinator?"Coordinación":"Staff");
   document.querySelectorAll("[data-coord]").forEach(el=>el.hidden=!coordinator);
   $("gate").hidden=true;$("workspace").hidden=false;
+  listenCatalog(token);
   const q=coordinator?query(collection(db,COLL),limit(150)):query(collection(db,COLL),where("createdBy","==",user.uid),limit(150));
   unsub=onSnapshot(q,{includeMetadataChanges:true},s=>{
    if(token!==session)return;
@@ -230,3 +231,95 @@ function makePng(r){
  }catch(e){feedback("Error al crear PNG: "+e.message,true);}
 }
 $("csv").onclick=()=>blobDownload(new Blob([encodeCsv(rows)],{type:"text/csv;charset=utf-8"}),"agora-reparaciones.csv");
+
+/* Catálogo de activos: fotografías persistentes vinculadas a cada pieza, sin duplicar módulos. */
+function listenCatalog(token){
+ unsubAssets=onSnapshot(query(collection(db,"agora_repair_assets"),limit(300)),snap=>{
+  if(token!==session)return;assets=snap.docs.map(d=>({...d.data(),id:d.id})).sort((a,b)=>a.project.localeCompare(b.project));renderCatalog();
+ },e=>feedback("No se pudo cargar inventario: "+e.message,true));
+}
+function renderCatalog(){
+ $("assetTotal").textContent="("+assets.length+")";
+ const picker=$("assetPicker"),before=picker.value;
+ picker.replaceChildren(new Option("Seleccionar / reportar sin catálogo",""));
+ for(const a of assets)picker.add(new Option(a.project+" · "+a.stand+" / "+a.piece,a.id));
+ picker.value=assets.some(a=>a.id===before)?before:"";
+ const box=$("assetCards");box.replaceChildren();
+ if(!assets.length){box.textContent="No hay piezas inventariadas todavía.";return;}
+ for(const a of assets){
+  const btn=document.createElement("button");
+  btn.className=a.id===selectedAsset?"primary":"";
+  btn.textContent=a.stand+" · "+a.piece+" ("+a.condition+")";
+  btn.title=a.project;btn.onclick=()=>showAsset(a.id);
+  box.append(btn);
+ }
+ if(selectedAsset)showAsset(selectedAsset);
+}
+$("assetPicker").onchange=()=>{
+ const a=assets.find(x=>x.id===$("assetPicker").value);if(!a)return;
+ form.elements.project.value=a.project;form.elements.asset.value=a.stand;form.elements.area.value=a.piece;
+ if(a.materialLink)form.elements.materialLink.value=a.materialLink;
+};
+$("assetForm").onsubmit=async e=>{
+ e.preventDefault();if(!coordinator)return feedback("Solo coordinación puede registrar activos.",true);
+ const btn=e.target.querySelector("button[type=submit]");btn.disabled=true;
+ try{
+  const data=Object.fromEntries(new FormData(e.target).entries());
+  if(data.materialLink&&!safeUrl(data.materialLink))throw Error("El enlace debe ser HTTPS");
+  const id=crypto.randomUUID();
+  const item={id,project:clean(data.project,120),stand:clean(data.stand,120),piece:clean(data.piece,120),
+   description:clean(data.description,800),materialLink:safeUrl(data.materialLink),
+   condition:data.condition||"Por revisar",photoPaths:[],createdBy:currentUser.uid,
+   createdAt:serverTimestamp(),updatedAt:serverTimestamp(),revision:1};
+  if(!item.project||!item.stand||!item.piece)throw Error("Completa proyecto, stand y pieza");
+  const batch=writeBatch(db);batch.set(doc(db,"agora_repair_assets",id),item);await batch.commit();
+  e.target.reset();selectedAsset=id;feedback("Pieza creada. Ahora puedes adjuntar sus fotos.");
+ }catch(err){feedback("No se guardó el inventario: "+err.message,true);}finally{btn.disabled=false;}
+};
+async function showAsset(id){
+ const a=assets.find(x=>x.id===id);if(!a)return;
+ selectedAsset=id;document.querySelectorAll("#assetCards button").forEach(b=>b.className=b.textContent===a.stand+" · "+a.piece+" ("+a.condition+")"?"primary":"");
+ const panel=$("inventoryDetail");
+ panel.innerHTML=`<hr><h3 style="font-size:14px">${esc(a.project)} · ${esc(a.stand)} · ${esc(a.piece)}</h3>
+ <p>${esc(a.description||"Sin descripción")} · Estado: ${esc(a.condition)}</p>
+ ${safeUrl(a.materialLink)?`<p><a href="${esc(safeUrl(a.materialLink))}" target="_blank" rel="noopener noreferrer">Abrir planos y materiales</a></p>`:""}
+ <div id="assetPhotos" class="photos"></div>
+ ${coordinator?`<label>Agregar fotografías de esta pieza<input type="file" multiple accept="image/*" id="assetPhotosInput"></label>
+ <button id="assetUpload">Guardar fotografías de la pieza</button>`:""}
+ <button id="assetToReport">Reportar daño en esta pieza</button>`;
+ $("assetToReport").onclick=()=>{
+  $("assetPicker").value=a.id;$("assetPicker").dispatchEvent(new Event("change"));
+  form.elements.problem.focus();form.scrollIntoView({behavior:"smooth",block:"center"});
+ };
+ if(coordinator)$("assetUpload").onclick=()=>uploadAssetPhotos(a);
+ const root=$("assetPhotos");
+ if(!a.photoPaths?.length){root.textContent="Sin fotografías registradas.";return;}
+ for(const path of a.photoPaths){
+  const img=document.createElement("img");img.alt="Fotografía de "+a.piece;img.loading="lazy";
+  root.append(img);
+  try{const blob=await getBlob(storageRef(storage,path));if(selectedAsset!==id)return;img.src=URL.createObjectURL(blob);}
+  catch{img.alt="Foto sin acceso";img.title="No se pudo leer esta imagen";}
+ }
+}
+async function uploadAssetPhotos(asset){
+ const files=[...($("assetPhotosInput")?.files||[])];
+ if(!files.length)return feedback("Selecciona fotografías de la pieza.",true);
+ if(files.length+(asset.photoPaths||[]).length>20)return feedback("Máximo 20 fotos por pieza.",true);
+ const button=$("assetUpload");button.disabled=true;
+ try{
+  for(const file of files){
+   if(!file.type.startsWith("image/"))throw Error("Solo imágenes.");
+   const jpg=await resize(file),path=`agora-repair-assets/${asset.id}/${currentUser.uid}/${crypto.randomUUID()}.jpg`;
+   await uploadBytes(storageRef(storage,path),jpg,{contentType:"image/jpeg"});
+   await runTransaction(db,async tx=>{
+    const ref=doc(db,"agora_repair_assets",asset.id),snap=await tx.get(ref);
+    if(!snap.exists())throw Error("La pieza no existe");
+    const old=snap.data(),photoPaths=[...(old.photoPaths||[])];
+    if(photoPaths.length>=20)throw Error("La pieza llegó a su límite de fotos");
+    photoPaths.push(path);
+    tx.update(ref,{photoPaths,revision:old.revision+1,updatedAt:serverTimestamp()});
+   });
+  }
+  feedback("Fotos almacenadas en el inventario de la pieza.");
+ }catch(e){feedback("Error al guardar fotografías del inventario: "+e.message,true);}finally{button.disabled=false;}
+}
