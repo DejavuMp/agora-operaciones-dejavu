@@ -165,3 +165,29 @@ test("Hot Cruji Bravo: la pantalla registra un caso real solo con coordinación 
  assert.match(js,/serverTimestamp\(\)/);
  assert.match(js,/Fotografías originales: 0 de 42 cargadas/);
 });
+
+test("Solicitudes de reparación es el flujo principal, inventario permanece secundario sin borrar datos",()=>{
+ const base=fileURLToPath(new URL("../",import.meta.url));
+ const html=readFileSync(base+"reparaciones.html","utf8");
+ const js=readFileSync(base+"reparaciones.js","utf8");
+ const main=html.indexOf('id="repairMain"'),inventory=html.indexOf('id="inventoryAdvanced"');
+ assert.ok(main>0&&inventory>main,"Primero se presentan las solicitudes");
+ assert.match(html,/<title>ÁGORA · Solicitudes de Reparación<\/title>/);
+ assert.match(html,/<details id="inventoryAdvanced" class="panel" data-coord hidden>/);
+ assert.match(html,/id="newRepair"/);
+ assert.match(html,/id="repairQueue"/);
+ assert.match(html,/id="requestForm"/);
+ assert.match(html,/id="assetForm"/);
+ assert.match(html,/id="hcbImport"/);
+ assert.match(html,/El inventario no es requisito/);
+ for(const field of ["project","asset","area","problem","priority","dueDate","scope",
+   "cause","solutionMode","instructions","materialLink","assetId"]){
+  assert.ok(html.includes('name="'+field+'"'),"Formulario conserva: "+field);
+ }
+ assert.ok(html.indexOf('id="hcbPhotoImport"')<inventory,"Importación fotográfica accesible desde solicitudes");
+ assert.equal((html.match(/id="hcbPhotoImport"/g)||[]).length,1);
+ assert.match(js,/if\(coordinator\)\{listenCatalog\(token\);listenMembers\(token\);\}/);
+ assert.match(js,/batch\.set\(requestRef\(id\),item\)/);
+ assert.match(js,/batch\.set\(logRef\(\)/);
+ assert.match(js,/importHotCrujiPhotoCase/);
+});
