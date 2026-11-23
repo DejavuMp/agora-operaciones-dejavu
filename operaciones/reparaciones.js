@@ -245,7 +245,13 @@ async function saveConceptEdit(r,formEl){
   checkEditRevision(old,editConceptRevision);
   return patch;
  });
+ const refreshed=await getDocFromServer(requestRef(r.id));
+ if(refreshed.exists()){
+  rows=[...rows.filter(x=>x.id!==r.id),{...refreshed.data(),id:r.id}];
+  grouped=groupRepairs(rows);
+ }
  editMode="";
+ renderList();renderDetail(selected);
  feedback("Arreglo actualizado en Firebase. Se conservaron sus fotos, cotizaciones y movimientos.");
 }
 async function saveGroupEdit(group,formEl){
@@ -267,7 +273,14 @@ async function saveGroupEdit(group,formEl){
     createdAt:serverTimestamp()});
   }
  });
+ const refreshed=await Promise.all(group.items.map(item=>getDocFromServer(requestRef(item.id))));
+ for(let i=0;i<refreshed.length;i++)if(refreshed[i].exists()){
+  const id=group.items[i].id;
+  rows=[...rows.filter(x=>x.id!==id),{...refreshed[i].data(),id}];
+ }
+ grouped=groupRepairs(rows);
  editMode="";
+ renderList();renderDetail(selected);
  feedback("Datos generales actualizados en todos los arreglos; historial y fotos conservados.");
 }
 async function addConceptToGroup(group,formEl){
