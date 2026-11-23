@@ -65,7 +65,12 @@ form.onsubmit=async e=>{
 };
 function renderList(){
  const term=$("filter").value.trim().toLowerCase();
- const filtered=rows.filter(r=>[r.id,r.project,r.asset,r.area,r.status].join(" ").toLowerCase().includes(term));
+ const status=$("statusFilter").value;
+ const filtered=rows.filter(r=>[r.id,r.project,r.asset,r.area,r.status].join(" ").toLowerCase().includes(term)&&(!status||r.status===status));
+ const pending=rows.filter(r=>["pendiente","revision","cotizando"].includes(r.status)).length;
+ const working=rows.filter(r=>["autorizado","reparacion"].includes(r.status)).length;
+ const done=rows.filter(r=>["terminado","entregado"].includes(r.status)).length;
+ $("repairMetrics").textContent=pending+" por decidir o cotizar · "+working+" en proceso · "+done+" terminadas o entregadas";
  $("records").innerHTML=filtered.map(r=>`<button class="record ${r.id===selected?"selected":""}" data-record="${esc(r.id)}">
   <b>${esc(r.asset)} · ${esc(r.area)}</b><span class="status">${esc(r.status)}</span>
   <small>${esc(r.project)} · ${esc(r.priority)} · Folio ${esc(r.id.slice(0,8))}</small></button>`).join("")||'<p class="muted">No hay solicitudes con este filtro.</p>';
@@ -88,6 +93,7 @@ function listenMembers(token){
  },e=>feedback("No se pudo cargar el catálogo de personal: "+e.message,true));
 }
 $("filter").oninput=renderList;
+$("statusFilter").onchange=renderList;
 function select(id){
  selected=id;const u=new URL(location.href);u.searchParams.set("solicitud",id);history.replaceState({}, "",u.href);
  renderList();renderDetail(id);
@@ -325,15 +331,19 @@ function renderCatalog(){
  picker.value=assets.some(a=>a.id===before)?before:"";
  const box=$("assetCards");box.replaceChildren();
  if(!assets.length){box.textContent="No hay piezas inventariadas todavía.";return;}
- for(const a of assets){
+ const term=$("assetSearch").value.trim().toLowerCase();
+ const filtered=assets.filter(a=>[a.project,a.stand,a.piece,a.description].join(" ").toLowerCase().includes(term));
+ for(const a of filtered.slice(0,30)){
   const btn=document.createElement("button");
   btn.className=a.id===selectedAsset?"primary":"";
   btn.textContent=a.stand+" · "+a.piece+" ("+a.condition+")";
   btn.title=a.project;btn.onclick=()=>showAsset(a.id);
   box.append(btn);
  }
+ if(filtered.length>30){const p=document.createElement("p");p.className="muted";p.textContent="Mostrando 30 de "+filtered.length+" piezas. Usa el buscador para acotar.";box.append(p);}
  if(selectedAsset)showAsset(selectedAsset);
 }
+$("assetSearch").oninput=renderCatalog;
 $("assetPicker").onchange=()=>{
  const a=assets.find(x=>x.id===$("assetPicker").value);if(!a)return;
  form.elements.project.value=a.project;form.elements.asset.value=a.stand;form.elements.area.value=a.piece;
