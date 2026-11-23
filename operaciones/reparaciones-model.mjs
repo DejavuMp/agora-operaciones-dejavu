@@ -19,7 +19,7 @@ export function makeRequest(raw,user,id,stamp){
   dueDate:clean(raw.dueDate,10),priority:PRIORITIES.includes(raw.priority)?raw.priority:"Normal",
   createdBy:user.uid,createdByEmail:clean(user.email,240),createdByName:clean(user.name,120),
   createdAt:stamp,updatedAt:stamp,status:"pendiente",repairRoute:"pendiente",
-  assignedTo:"",decisionBy:"",decisionNote:"",estimatedCost:0,
+  assignedTo:"",assignedUid:"",decisionBy:"",decisionNote:"",estimatedCost:0,
   quotes:[],selectedQuoteId:"",photos:[],revision:1
  };
  if(!r.project||!r.asset||!r.area||!r.problem)throw Error("Completa proyecto, activo, pieza y problema");
@@ -43,7 +43,7 @@ export function summary(r,link=""){
  "Materiales: "+(r.materialLink||"Sin enlace"),"Necesario para: "+(r.dueDate||"Sin fecha"),
  "Prioridad: "+r.priority,"Reportó: "+r.createdByName+" ("+r.createdByEmail+")",
  "Estado: "+r.status,"Ruta de arreglo: "+r.repairRoute,
- "Responsable: "+(r.assignedTo||"Por asignar"),"Decidió: "+(r.decisionBy||"Pendiente"),
+ "Responsable: "+(r.assignedTo||"Por asignar"),"Cuenta asignada: "+(r.assignedUid||"No vinculada"),"Decidió: "+(r.decisionBy||"Pendiente"),
  "Costo estimado: $"+Number(r.estimatedCost||0).toFixed(2)+" MXN",
  "Cotizaciones:\n"+quote,"Notas: "+(r.decisionNote||""),
  "Fotografías registradas: "+(r.photos||[]).length,
