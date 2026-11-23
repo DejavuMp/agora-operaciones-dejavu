@@ -5,6 +5,7 @@ import {fileURLToPath} from "node:url";
 import {makeRequest,makeQuote,safeUrl,summary,encodeCsv,ROUTES,STATUSES} from "../reparaciones-model.mjs";
 import {createInviteToken,invitePayload,supplierResponse,quoteFromInvite,supplierInviteUrl,TOKEN_PATTERN} from "../reparaciones-invitaciones-model.mjs";
 import {photoRefId,photoMarker,validatePhotoData,sparkPhotoPayload,MAX_PHOTO_CHARS} from "../reparaciones-fotos-spark.mjs";
+import {HCB_PROJECT,HCB_STAND,HCB_ASSETS,HCB_INSPECTIONS,HCB_CASE,hcbAssetById,hcbImportPlan} from "../hot-cruji-bravo-caso.mjs";
 const id="d630d5ec-4e3a-4d51-92b2-0d917f43ebc9";
 const user={uid:"u-01",email:"staff@example.test",name:"Staff de prueba"};
 const raw={project:"Hot Cruji Bravo",asset:"Stand principal",assetId:"",scope:"Elemento específico",
@@ -124,4 +125,43 @@ test("El frontend Spark no depende de APIs de Storage o facturación",()=>{
  assert.match(ui,/agora_repair_photos/);
  assert.match(ui,/compressSparkPhoto/);
  assert.match(ui,/runTransaction/);
+});
+
+test("Hot Cruji Bravo: inventario inicial sustentado y sin daños inventados",()=>{
+ assert.equal(HCB_PROJECT,"Hot Cruji Bravo");
+ assert.equal(HCB_CASE.photosExpected,42);
+ assert.equal(HCB_CASE.photosAttached,0);
+ assert.equal(HCB_ASSETS.length,13);
+ assert.equal(HCB_INSPECTIONS.length,5);
+ const seen=new Set();
+ for(const a of HCB_ASSETS){
+  assert.match(a.id,/^[a-f0-9-]{36}$/);
+  assert.ok(a.description.length<=790,"Descripción legible para Firestore");
+  assert.ok(a.piece.length<=120);
+  assert.equal(a.condition,"Por revisar");
+  assert.ok(!seen.has(a.id));seen.add(a.id);
+ }
+ for(const q of HCB_INSPECTIONS){
+  assert.match(q.id,/^[a-f0-9-]{36}$/);
+  assert.ok(!seen.has(q.id));seen.add(q.id);
+  assert.ok(hcbAssetById(q.assetId),"Cada inspección referencia inventario conocido");
+  assert.match(q.problem,/Revisión pendiente:/);
+  assert.ok(q.area.length<=120&&q.problem.length<=2000&&q.instructions.length<=2000);
+ }
+ const all=hcbImportPlan();
+ assert.equal(all.assets.length,13);assert.equal(all.inspections.length,5);
+ assert.equal(hcbImportPlan(HCB_ASSETS.map(a=>a.id),HCB_INSPECTIONS.map(q=>q.id)).assets.length,0);
+ assert.equal(hcbImportPlan(HCB_ASSETS.map(a=>a.id),HCB_INSPECTIONS.map(q=>q.id)).inspections.length,0);
+});
+test("Hot Cruji Bravo: la pantalla registra un caso real solo con coordinación y sin inventar fotos",()=>{
+ const base=fileURLToPath(new URL("../",import.meta.url));
+ const js=readFileSync(base+"reparaciones.js","utf8");
+ const html=readFileSync(base+"reparaciones.html","utf8");
+ assert.match(html,/id="hcbImport"/);
+ assert.match(html,/data-coord hidden/);
+ assert.match(js,/if\(!coordinator\|\|!currentUser\)/);
+ assert.match(js,/getDocsFromServer/);
+ assert.match(js,/hcbImportPlan/);
+ assert.match(js,/serverTimestamp\(\)/);
+ assert.match(js,/Fotografías originales: 0 de 42 cargadas/);
 });
