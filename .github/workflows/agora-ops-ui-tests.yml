@@ -56,6 +56,8 @@ jobs:
           node --check operaciones/reparaciones-model.mjs
           node --check operaciones/reparaciones-editar.mjs
           node --test operaciones/tests/qa-reparaciones.mjs
+          node --check operaciones/reparaciones-pdf-fotos.mjs
+          node --test operaciones/tests/qa-reparaciones-pdf-fotos.mjs
           node --check operaciones/hot-cruji-bravo-importar.mjs
           node --check operaciones/hot-cruji-bravo-zip.mjs
           node --test operaciones/tests/qa-hcb-fotos.mjs

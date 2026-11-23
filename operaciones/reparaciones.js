@@ -7,6 +7,7 @@ import {HCB_PROJECT,HCB_STAND,HCB_CASE,HCB_ASSETS,HCB_INSPECTIONS,hcbAssetById,h
 import {importHotCrujiPhotoCase} from "./hot-cruji-bravo-importar.mjs";
 import {groupRepairs,bundleByItem,bundleStatus,bundleSummary,bundledCsv} from "./reparaciones-agrupadas.mjs";
 import {repairEditPatch,repairGroupPatch,checkEditRevision} from "./reparaciones-editar.mjs";
+import {buildRepairsPhotoPdf} from "./reparaciones-pdf-fotos.mjs";
 import {GoogleAuthProvider,onAuthStateChanged,signInWithPopup,signInWithRedirect,signOut} from "https://www.gstatic.com/firebasejs/13.1.0/firebase-auth.js";
 import {collection,doc,query,where,limit,onSnapshot,getDocFromServer,getDocsFromServer,serverTimestamp,writeBatch,runTransaction} from "https://www.gstatic.com/firebasejs/13.1.0/firebase-firestore.js";
 // Plan Spark: fotos comprimidas en documentos privados de Firestore. Sin Storage.
@@ -357,7 +358,7 @@ function renderDetail(id){
  ${detailRow("Requerido",r.dueDate)}${detailRow("Prioridad",r.priority)}${detailRow("Reportó",r.createdByName)}
  ${detailRow("Ruta",r.repairRoute)}${detailRow("Responsable",r.assignedTo)}${detailRow("Coordinación",r.decisionBy)}${detailRow("Notas",r.decisionNote)}</dl>
  ${safeUrl(r.materialLink)?`<p><a href="${esc(safeUrl(r.materialLink))}" target="_blank" rel="noopener noreferrer">Abrir materiales / planos</a></p>`:""}
- <div class="actions"><button id="copy">Copiar ficha</button><button id="email">Correo</button><button id="whatsapp">WhatsApp</button><button id="pdf">PDF</button><button id="png">Imagen PNG</button><button id="copyLink">Copiar enlace</button></div>
+ <div class="actions"><button id="copy">Copiar ficha</button><button id="email">Correo</button><button id="whatsapp">WhatsApp</button><button id="pdf">PDF con fotos y ajustes</button><button id="png">Imagen PNG</button><button id="copyLink">Copiar enlace</button></div>
  <div class="two" style="align-items:start"><div><h3 style="font-size:14px">Enlace y QR privado</h3><div id="qr"></div><p class="form-help">Requiere una cuenta con permisos para abrir el expediente. No compartir con acceso anónimo.</p></div>
  <div><h3 style="font-size:14px">Evidencias</h3><div id="photos" class="photos"></div><label>Adjuntar fotografías JPEG/PNG<input id="photoFiles" type="file" multiple accept="image/*"></label><label>Tipo de evidencia<select id="photoStage"><option value="antes">Antes</option><option value="avance">Durante</option><option value="despues">Después</option></select></label><button id="uploadPhotos">Guardar fotografías</button><p class="form-help">Máximo 12 evidencias por folio. Vista previa JPEG comprimida, menor a 90 KB. Conserva el original en Drive.</p></div></div>
  ${!coordinator?`<hr><h3 style="font-size:15px">Registrar avance del arreglo</h3>
@@ -511,19 +512,23 @@ async function loadHistory(r){
 }
 function blobDownload(blob,file){const url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download=file;a.click();setTimeout(()=>URL.revokeObjectURL(url),3000);}
 function qrCanvas(){return $("qr")?.querySelector("canvas")||null;}
-function makePdf(r){
- const lib=window.jspdf?.jsPDF;if(!lib){feedback("No se cargó el generador PDF; usa Imprimir del navegador.",true);window.print();return;}
- try{const group=bundleByItem(rows,r.id),p=new lib({unit:"mm",format:"a4"}),txt=bundleSummary(group,link(selected)),lines=p.splitTextToSize(txt,175);let y=22;
- p.setFontSize(13);p.setFont("helvetica","bold");p.text("DEJAVÚ · SOLICITUD DE REPARACIÓN",18,y);p.setFont("helvetica","normal");p.setFontSize(9);y+=12;
- for(const line of lines){if(y>270){p.addPage();y=20;}p.text(line,18,y);y+=5;}
- if(y>220){p.addPage();y=20;}
- p.setFillColor(24,27,32);p.roundedRect(18,y+3,92,11,2,2,"F");
- p.setTextColor(255,255,255);p.setFontSize(10);
- p.textWithLink("ABRIR SOLICITUD GENERAL",22,y+10,{url:link(selected)});
- p.setTextColor(32,35,40);
- const qr=qrCanvas();if(qr)p.addImage(qr.toDataURL("image/png"),"PNG",18,y+18,29,29);
- p.save("agora-solicitud-reparaciones-"+selected.slice(0,8)+".pdf");
- }catch(e){feedback("No se pudo generar PDF: "+e.message,true);}
+async function makePdf(r){
+ const jsPDF=window.jspdf?.jsPDF;
+ if(!jsPDF)return feedback("No se cargó el generador PDF. Revisa tu conexión y vuelve a abrir ÁGORA.",true);
+ const button=$("pdf"),oldLabel=button?.textContent;
+ if(button){button.disabled=true;button.textContent="Preparando PDF con fotos...";}
+ try{
+  const group=bundleByItem(rows,r.id);
+  if(!group)throw Error("No se encontró la solicitud general.");
+  const result=await buildRepairsPhotoPdf({
+   jsPDF,group,url:link(group.id),readPhoto:getSparkPhoto,qrCanvas:qrCanvas()
+  });
+  result.pdf.save("agora-reparaciones-con-fotos-"+group.id.slice(0,8)+".pdf");
+  const expected=group.items.reduce((n,item)=>n+(item.photos?.length||0),0);
+  feedback("PDF creado con "+result.embedded+" de "+expected+" fotos asociadas y los ajustes de todos los arreglos."+
+   (result.readErrors?" Algunas fotos no estuvieron disponibles para tu cuenta; revisa las evidencias.":""));
+ }catch(error){feedback("No se pudo generar PDF con fotos: "+error.message,true);}
+ finally{if(button){button.disabled=false;button.textContent=oldLabel;}}
 }
 function makePng(r){
  try{
