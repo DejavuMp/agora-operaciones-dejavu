@@ -20,6 +20,10 @@ function show(invite){
   const dt=document.createElement("dt"),dd=document.createElement("dd");
   dt.textContent=label;dd.textContent=invite.snapshot[key];detail.append(dt,dd);
  }
+ const preview=invite.snapshot?.photoPreview||"";
+ const valid=typeof preview==="string"&&preview.startsWith("data:image/jpeg;base64,")&&preview.length<=150000;
+ $("photoBlock").hidden=!valid;
+ if(valid)$("photoPreview").src=preview;
  const material=invite.snapshot?.materialLink||"";
  if(material.startsWith("https://")){
   const a=document.createElement("a");a.textContent="Abrir planos o materiales compartidos";a.href=material;
