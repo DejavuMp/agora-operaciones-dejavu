@@ -35,7 +35,8 @@ hr{border:0;border-top:1px solid var(--line);margin:20px 0}.hide,[hidden]{displa
 <div class="notice"><b id="who"></b><div class="muted">Los reportes y sus fotografías se guardan en Firebase. Solo coordinación y las personas autorizadas pueden consultarlos. Un enlace o QR no evita el inicio de sesión.</div><div class="actions"><button id="logout">Cerrar sesión</button><button id="csv" data-coord hidden>Exportar lista CSV</button></div></div>
 <section class="panel" style="margin-bottom:15px">
 <div class="detail-head"><div><h2 style="margin-bottom:6px">Inventario de stands y piezas <span id="assetTotal" class="muted"></span></h2><p class="muted">Cada pieza se registra una sola vez; sus fotografías y solicitudes quedan vinculadas.</p></div></div>
-<div id="assetCards" class="actions" style="align-items:stretch"><span class="muted">Cargando catálogo…</span></div>
+<label style="max-width:420px">Buscar pieza en inventario<input id="assetSearch" type="search" placeholder="Proyecto, stand o pieza"></label>
+<div id="assetCards" class="actions" style="align-items:stretch;max-height:240px;overflow-y:auto"><span class="muted">Cargando catálogo…</span></div>
 <form id="assetForm" data-coord hidden>
 <hr><h3 style="font-size:14px">Registrar nueva pieza</h3><div class="two">
 <label>Proyecto<input name="project" maxlength="120" required></label><label>Stand o mueble<input name="stand" maxlength="120" required></label>
@@ -60,7 +61,8 @@ hr{border:0;border-top:1px solid var(--line);margin:20px 0}.hide,[hidden]{displa
 <button type="submit" class="red" id="submitRequest">Crear solicitud y folio</button>
 <p class="form-help">Después podrás adjuntar las fotografías al folio creado, sin perderlas al cerrar la página.</p>
 </form></section>
-<section class="panel"><div class="detail-head"><h2>Solicitudes <span id="total" class="muted"></span></h2><input id="filter" placeholder="Buscar por folio, proyecto o pieza" aria-label="Buscar solicitudes" style="max-width:300px;margin:0"></div>
+<section class="panel"><div class="detail-head"><h2>Solicitudes <span id="total" class="muted"></span></h2><div class="actions" style="margin:0"><input id="filter" type="search" placeholder="Buscar por folio, proyecto o pieza" aria-label="Buscar solicitudes" style="max-width:265px;margin:0"><select id="statusFilter" aria-label="Filtrar por estado" style="max-width:170px;margin:0"><option value="">Todos los estados</option><option value="pendiente">Pendiente</option><option value="revision">En revisión</option><option value="cotizando">Cotizando</option><option value="autorizado">Autorizado</option><option value="reparacion">En reparación</option><option value="terminado">Terminado</option><option value="entregado">Entregado</option></select></div></div>
+<div id="repairMetrics" class="muted" style="margin-bottom:15px"></div>
 <div id="records"></div><hr><div id="detail"><p class="muted">Selecciona una solicitud para ver su estado, fotos y seguimiento.</p></div></section>
 </div>
 </section><p id="message" role="status" aria-live="polite"></p>
