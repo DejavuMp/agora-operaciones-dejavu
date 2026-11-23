@@ -68,7 +68,19 @@ hr{border:0;border-top:1px solid var(--line);margin:20px 0}.hide,[hidden]{displa
 </details>
 <button type="submit" class="red" id="submitRequest">Crear solicitud de reparación</button>
 <p class="form-help">Se generará un folio y podrás adjuntar fotos, asignar la reparación, solicitar cotizaciones y compartir el expediente.</p>
-</form></section>
+</form>
+<details class="request-extra" data-coord hidden><summary>¿Tienes el ZIP de Hot Cruji Bravo? Registrar sus solicitudes con fotografías</summary>
+<p class="form-help">Carga opcional de siete reportes ya identificados y 42 fotografías desde el ZIP, sin abrir el inventario. Requiere tu cuenta de coordinación y no duplicará folios existentes.</p>
+<section style="border-top:1px dashed #d8dade;margin-top:12px;padding-top:14px">
+  <p style="margin:0 0 8px"><strong>Solicitudes fotográficas · 42 evidencias originales</strong></p>
+  <p class="muted" style="margin:0 0 10px">Preparamos siete solicitudes y dos nuevas piezas a partir de las fotografías reales. Selecciona el ZIP original de WhatsApp para registrar cada foto comprimida directamente en Firestore privado. Los archivos originales nunca se publican en GitHub Pages. Sin facturación.</p>
+  <input id="hcbZipInput" type="file" accept=".zip,application/zip,application/x-zip-compressed" hidden aria-label="Seleccionar ZIP de las 42 fotografías">
+  <button type="button" id="hcbPhotoImport" class="primary">Registrar las solicitudes y sus 42 fotos</button>
+  <p id="hcbPhotoProgress" class="muted" role="status" aria-live="polite">Pendiente de seleccionar el ZIP original.</p>
+  <div id="hcbPhotoLinks" class="actions" aria-label="Folios de reparaciones importadas"></div>
+ </section>
+</details>
+</section>
 <section class="panel" id="repairQueue"><div class="detail-head"><h2>Seguimiento de solicitudes <span id="total" class="muted"></span></h2><div class="actions" style="margin:0"><input id="filter" type="search" placeholder="Buscar por folio, proyecto o pieza" aria-label="Buscar solicitudes" style="max-width:265px;margin:0"><select id="statusFilter" aria-label="Filtrar por estado" style="max-width:170px;margin:0"><option value="">Todos los estados</option><option value="pendiente">Pendiente</option><option value="revision">En revisión</option><option value="cotizando">Cotizando</option><option value="autorizado">Autorizado</option><option value="reparacion">En reparación</option><option value="terminado">Terminado</option><option value="entregado">Entregado</option></select></div></div>
 <div id="repairMetrics" class="muted" style="margin-bottom:15px"></div>
 <div id="records"></div><hr><div id="detail"><p class="muted">Selecciona una solicitud para ver su estado, fotos y seguimiento.</p></div></section>
@@ -93,14 +105,7 @@ hr{border:0;border-top:1px solid var(--line);margin:20px 0}.hide,[hidden]{displa
   <button id="hcbImport" type="button" class="primary">Registrar Hot Cruji Bravo</button>
  </div>
   <p id="hcbImportStatus" role="status" aria-live="polite" class="muted">El expediente se guarda en Firestore con la cuenta de coordinación. Los registros ya existentes se conservan.</p>
- <section style="border-top:1px dashed #d8dade;margin-top:12px;padding-top:14px">
-  <p style="margin:0 0 8px"><strong>Solicitudes fotográficas · 42 evidencias originales</strong></p>
-  <p class="muted" style="margin:0 0 10px">Preparamos siete solicitudes y dos nuevas piezas a partir de las fotografías reales. Selecciona el ZIP original de WhatsApp para registrar cada foto comprimida directamente en Firestore privado. Los archivos originales nunca se publican en GitHub Pages. Sin facturación.</p>
-  <input id="hcbZipInput" type="file" accept=".zip,application/zip,application/x-zip-compressed" hidden aria-label="Seleccionar ZIP de las 42 fotografías">
-  <button type="button" id="hcbPhotoImport" class="primary">Registrar las solicitudes y sus 42 fotos</button>
-  <p id="hcbPhotoProgress" class="muted" role="status" aria-live="polite">Pendiente de seleccionar el ZIP original.</p>
-  <div id="hcbPhotoLinks" class="actions" aria-label="Folios de reparaciones importadas"></div>
- </section>
+
  <details style="margin:10px 0"><summary style="cursor:pointer;font-weight:600">Ver las piezas y revisiones preparadas</summary><div id="hcbPreview" class="muted" style="margin-top:10px"></div></details>
 </section>
 </div>
