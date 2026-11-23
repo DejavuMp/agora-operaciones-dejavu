@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="es-MX"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow"><title>ÁGORA · Inventario y reparaciones</title>
+<style>
+:root{color-scheme:light;font:14px Arial,Helvetica,sans-serif;--ink:#1b1e22;--line:#e4e6e8;--muted:#68717b;--brand:#d72b35;--bg:#f5f6f6}
+*{box-sizing:border-box}body{background:var(--bg);margin:0;color:var(--ink)}a{color:#272c32}
+header{background:#14171b;color:white;padding:18px max(22px,calc((100vw - 1260px)/2));display:flex;justify-content:space-between;align-items:center;gap:15px;flex-wrap:wrap}
+header img{width:138px;height:auto;max-height:50px;object-fit:contain}header div{flex:1;min-width:230px}header strong{display:block;font-size:19px}header span{font-size:12px;color:#b6bcc2}header a{color:white}
+main{max-width:1260px;margin:24px auto;padding:0 16px 45px}.notice{background:#fff;border:1px solid var(--line);padding:16px 19px;border-radius:12px;margin-bottom:14px;line-height:1.55}
+#gate{max-width:540px;margin:40px auto;text-align:center}h1{font-size:25px;margin:0 0 5px}h2{font-size:18px;margin:0 0 17px}.muted{color:var(--muted);font-size:12px;line-height:1.55}.tabs{display:flex;gap:7px;margin-bottom:16px}
+button,.button{font:600 13px Arial,Helvetica,sans-serif;border:1px solid #d7dadd;border-radius:9px;min-height:38px;padding:10px 14px;cursor:pointer;background:white;color:#222;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:7px}
+button:hover,.button:hover{border-color:#888}button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:3px solid #fd9ba1;outline-offset:2px}
+button.primary{background:#16191c;color:#fff;border-color:#16191c}button.red{background:var(--brand);color:white;border-color:var(--brand)}button:disabled{opacity:.5;cursor:wait}
+.grid{display:grid;grid-template-columns:minmax(290px,400px) minmax(420px,1fr);gap:15px;align-items:start}@media(max-width:900px){.grid{grid-template-columns:1fr}}
+.panel{background:white;border-radius:13px;border:1px solid var(--line);padding:20px;min-width:0}
+label{display:block;font-size:12px;font-weight:700;margin:12px 0;color:#343940}
+input,select,textarea{display:block;width:100%;margin-top:6px;font:14px Arial,Helvetica,sans-serif;padding:10px 11px;background:white;color:#1b1e22;border:1px solid #d9dde1;border-radius:8px;min-width:0}
+textarea{resize:vertical;min-height:78px}.two{display:grid;grid-template-columns:1fr 1fr;gap:12px}@media(max-width:530px){.two{grid-template-columns:1fr}}
+.actions{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0 0}.form-help{font-size:11px;color:var(--muted);font-weight:400}
+#records{max-height:570px;overflow:auto;display:grid;gap:8px;align-content:start}.record{border:1px solid var(--line);background:#fff;text-align:left;display:block;padding:15px;min-height:90px;border-radius:11px;width:100%}.record.selected{border-color:#d72b35;box-shadow:inset 3px 0 #d72b35}
+.record b{display:block;font-size:14px;overflow-wrap:anywhere}.record small{display:block;color:var(--muted);font-size:11px;margin-top:7px}.status{font-size:11px;border-radius:18px;background:#f0f1f1;padding:4px 8px;display:inline-block;margin:6px 0}
+#detail{min-height:160px}.detail-head{display:flex;justify-content:space-between;align-items:start;gap:12px;flex-wrap:wrap}dl{display:grid;grid-template-columns:110px 1fr;gap:8px 10px;font-size:12px;line-height:1.5}dt{color:var(--muted)}dd{margin:0;overflow-wrap:anywhere}
+.photos{display:flex;gap:9px;flex-wrap:wrap;margin:10px 0}.photos img{width:150px;height:115px;object-fit:cover;border-radius:9px;border:1px solid var(--line)}
+.quote{border:1px solid var(--line);border-radius:9px;padding:12px;font-size:12px;margin:8px 0;overflow-wrap:anywhere}.quote.selected{border-color:var(--brand)}.quote strong{display:block}
+hr{border:0;border-top:1px solid var(--line);margin:20px 0}.hide,[hidden]{display:none!important}
+#message{margin-top:11px;min-height:20px}#message.error{color:#a20f18}#message.ok{color:#18613b}
+#qr img,#qr canvas{display:block;width:128px;height:128px;margin:10px 0}
+#history{margin:12px 0 0;padding-left:18px;font-size:12px;line-height:1.8}footer{font-size:11px;color:var(--muted);padding:10px 0}
+</style></head>
+<body>
+<header><img src="./assets/dejavu-horizontal.png" alt="Dejavú Marketing"><div><strong>ÁGORA · Inventario y reparaciones</strong><span>Solicitudes de arreglos · Stands, muebles y piezas</span></div><a href="./" class="button" style="background:transparent;color:#fff">Operaciones</a></header>
+<main>
+<section id="gate" class="panel"><h1>Solicitudes de reparación</h1><p id="gateText" class="muted">Verificando acceso seguro a ÁGORA.</p><button id="login" class="primary" hidden>Ingresar con Google</button></section>
+<section id="workspace" hidden>
+<div class="notice"><b id="who"></b><div class="muted">Los reportes y sus fotografías se guardan en Firebase. Solo coordinación y las personas autorizadas pueden consultarlos. Un enlace o QR no evita el inicio de sesión.</div><div class="actions"><button id="logout">Cerrar sesión</button><button id="csv" data-coord hidden>Exportar lista CSV</button></div></div>
+<div class="grid">
+<section class="panel"><h2>Reportar un arreglo</h2>
+<form id="requestForm">
+<div class="two"><label>Proyecto / activación *<input name="project" maxlength="120" placeholder="Hot Cruji Bravo" required></label><label>Stand / mueble *<input name="asset" maxlength="120" placeholder="Stand principal" required></label></div>
+<div class="two"><label>¿Qué se dañó?<select name="scope"><option>Elemento específico</option><option>Área del stand</option><option>Stand completo</option><option>Mueble suelto</option></select></label><label>Pieza o área *<input name="area" maxlength="120" placeholder="Mostrador frontal" required></label></div>
+<label>Problema / arreglo requerido *<textarea name="problem" required maxlength="2000" placeholder="Describe qué sucede y qué necesita atención"></textarea></label>
+<label>Motivo o causa del daño<input name="cause" maxlength="250" placeholder="Montaje, traslado, desgaste..."></label>
+<label>Solución<select name="solutionMode"><option value="instrucciones">Se conoce el trabajo a realizar</option><option value="propuesta">Necesitamos propuesta de solución</option></select></label>
+<label>Instrucciones o detalles<textarea name="instructions" maxlength="2000"></textarea></label>
+<label>Planos, artes, materiales (HTTPS)<input name="materialLink" type="url" placeholder="https://..."></label>
+<div class="two"><label>Fecha requerida<input name="dueDate" type="date"></label><label>Prioridad<select name="priority"><option>Normal</option><option>Alta</option><option>Urgente</option></select></label></div>
+<button type="submit" class="red" id="submitRequest">Crear solicitud y folio</button>
+<p class="form-help">Después podrás adjuntar las fotografías al folio creado, sin perderlas al cerrar la página.</p>
+</form></section>
+<section class="panel"><div class="detail-head"><h2>Solicitudes <span id="total" class="muted"></span></h2><input id="filter" placeholder="Buscar por folio, proyecto o pieza" aria-label="Buscar solicitudes" style="max-width:300px;margin:0"></div>
+<div id="records"></div><hr><div id="detail"><p class="muted">Selecciona una solicitud para ver su estado, fotos y seguimiento.</p></div></section>
+</div>
+</section><p id="message" role="status" aria-live="polite"></p>
+<footer>ÁGORA Dejavú · Sin acceso anónimo. La aprobación de trabajos y presupuestos solo corresponde a coordinación.</footer>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.2/jspdf.umd.min.js" defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" defer></script>
+<script type="module" src="./reparaciones.js"></script>
+</body></html>
