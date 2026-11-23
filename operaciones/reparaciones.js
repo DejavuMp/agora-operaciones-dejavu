@@ -325,7 +325,8 @@ function renderDetail(id){
   '<p class="muted">Folio general: '+esc(group.id)+' · '+group.items.length+
    ' arreglos · '+group.open+' pendientes · '+group.done+' terminados · '+group.items.reduce((sum,item)=>sum+(item.photos?.length||0),0)+' fotografías</p>'+
   '<div class="actions"><button type="button" id="copyGroup">Copiar solicitud completa</button>'+
-  '<button type="button" id="newGroupRepair">+ Agregar otro arreglo</button></div>'+
+  (coordinator?'<button type="button" id="editGeneralButton">Editar datos generales</button><button type="button" id="newGroupRepair">+ Agregar arreglo</button>':'')+
+  '</div>'+
   '<p class="repair-section-label">Conceptos dentro de esta solicitud</p>'+
   '<div class="repair-items">'+group.items.map((item,i)=>
     '<button type="button" class="repair-item '+(item.id===r.id?'selected':'')+
@@ -337,7 +338,8 @@ function renderDetail(id){
  <p>${esc(q.scope||"Sin alcance")} · ${esc(q.note||"")}</p>
  ${safeUrl(q.link)?`<a href="${esc(safeUrl(q.link))}" rel="noopener noreferrer" target="_blank">Ver cotización</a>`:""}
  ${coordinator?`<button data-pick="${esc(q.id)}" type="button">${q.id===r.selectedQuoteId?"Seleccionada":"Elegir cotización"}</button>`:""}</div>`).join("")||'<p class="muted">Aún no hay cotizaciones registradas.</p>';
- $("detail").innerHTML=groupTop+`<div class="detail-head"><div><h2>Arreglo: ${esc(r.area)}</h2><details class="muted" style="margin-top:6px"><summary>Identificador interno de este concepto</summary><code>${esc(r.id)}</code></details></div><span class="status">${esc(r.status)}</span></div>
+ $("detail").innerHTML=groupTop+renderEditPanel(group,r)+`<div class="detail-head"><div><h2>Arreglo: ${esc(r.area)}</h2><details class="muted" style="margin-top:6px"><summary>Identificador interno de este concepto</summary><code>${esc(r.id)}</code></details></div><span class="status">${esc(r.status)}</span></div>
+ ${coordinator?'<div class="actions"><button type="button" id="editConceptButton">Editar este arreglo</button></div>':'<p class="muted">Con acceso Staff puedes adjuntar fotografías y registrar avances. Para cambiar los datos o la asignación solicita apoyo a coordinación.</p>'}
  <dl>${detailRow("Proyecto",r.project)}${detailRow("Problema",r.problem)}${detailRow("Motivo",r.cause)}${detailRow("Instrucciones",r.solutionMode==="propuesta"?"Solicitar propuesta":r.instructions)}
  ${detailRow("Requerido",r.dueDate)}${detailRow("Prioridad",r.priority)}${detailRow("Reportó",r.createdByName)}
  ${detailRow("Ruta",r.repairRoute)}${detailRow("Responsable",r.assignedTo)}${detailRow("Coordinación",r.decisionBy)}${detailRow("Notas",r.decisionNote)}</dl>
@@ -365,16 +367,12 @@ function renderDetail(id){
  <button type="submit" class="primary">Guardar decisión y seguimiento</button></form>
  <hr><h3 style="font-size:14px">Historial de movimientos</h3><ul id="history"><li>Cargando historial...</li></ul>`:""}`;
  qr();renderPhotos(r);
+ bindRepairEditActions(group,r);
  document.querySelectorAll("[data-repair-item]").forEach(b=>b.onclick=()=>{
-  activeRepairItemId=b.dataset.repairItem;renderDetail(selected);
+  editMode="";activeRepairItemId=b.dataset.repairItem;renderDetail(selected);
  });
  if($("copyGroup"))$("copyGroup").onclick=()=>copy(bundleSummary(group,link(group.id)));
- if($("newGroupRepair"))$("newGroupRepair").onclick=()=>{
-  form.elements.project.value=group.project;form.elements.asset.value=group.asset;
-  form.elements.area.value="";form.elements.problem.value="";
-  $("newRepair").scrollIntoView({behavior:"smooth",block:"start"});
-  form.elements.area.focus();
- };
+ if($("newGroupRepair"))$("newGroupRepair").onclick=()=>beginRepairEdit("new",group,r);
  $("copy").onclick=()=>copy(bundleSummary(group||bundleByItem(rows,r.id),link(selected)));
  $("copyLink").onclick=()=>copy(link(selected));
  $("email").onclick=()=>{location.href="mailto:?subject="+encodeURIComponent("ÁGORA · Solicitud general "+r.project+" · "+selected.slice(0,8))+"&body="+encodeURIComponent(bundleSummary(group,link(selected)).slice(0,4500));};
