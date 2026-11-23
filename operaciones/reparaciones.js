@@ -381,12 +381,12 @@ async function registerHotCrujiCase(){
  const foundAssets=assetSnapshot.docs.map(d=>({...d.data(),id:d.id}));
  const foundRequests=requestSnapshot.docs.map(d=>({...d.data(),id:d.id}));
  const duplicates=new Set(foundAssets.map(x=>x.id));
- const byPiece=new Map(foundAssets.filter(x=>x.stand===HCB_STAND).map(x=>[x.piece,x.id]));
+ const byPiece=new Map(foundAssets.map(x=>[String(x.piece||"").trim().toLowerCase(),x.id]));
  const existingRequests=new Set(foundRequests.map(x=>x.id));
  const alreadyInspected=new Set(foundRequests
   .filter(x=>x.cause==="Inspección inicial de inventario · sin daño confirmado").map(x=>x.area));
  const plan=hcbImportPlan([...duplicates], [...existingRequests]);
- const toCreate=plan.assets.filter(x=>!byPiece.has(x.piece));
+ const toCreate=plan.assets.filter(x=>!byPiece.has(x.piece.trim().toLowerCase()));
  const inspections=plan.inspections.filter(x=>!alreadyInspected.has(x.area));
  if(!toCreate.length&&!inspections.length){
   $("hcbImportStatus").textContent="El caso ya está registrado. Se conservaron todas las piezas y revisiones existentes.";
@@ -402,7 +402,7 @@ async function registerHotCrujiCase(){
   const batch=writeBatch(db);
   for(const task of inspections){
    const related=hcbAssetById(task.assetId);
-   const actualAssetId=related?(byPiece.get(related.piece)||related.id):"";
+   const actualAssetId=related?(byPiece.get(related.piece.trim().toLowerCase())||related.id):"";
    const request=makeRequest({
     project:HCB_PROJECT,asset:HCB_STAND,assetId:actualAssetId,
     scope:"Elemento específico",area:task.area,
