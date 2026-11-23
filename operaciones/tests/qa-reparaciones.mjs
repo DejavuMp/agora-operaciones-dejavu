@@ -294,7 +294,7 @@ test("Reparaciones: la interfaz permite editar, cancelar, agregar y guardar hist
  assert.match(js,/async function addConceptToGroup\(/);
  assert.match(js,/checkEditRevision\(/);
  assert.match(js,/action:"creada"/);
- assert.match(js,/action:"edición general"/);
+ assert.match(js,/action:"decisión",detail:"Edición general:/);
  assert.match(js,/await runTransaction\(db,async tx=>/);
  assert.match(html,/repair-edit-form/);
  assert.doesNotMatch(js,/deleteDoc\(|batch\.delete\(/);
