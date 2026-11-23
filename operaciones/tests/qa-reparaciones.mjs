@@ -78,3 +78,23 @@ test("respuesta del proveedor valida monto y enlace HTTPS; importación una vez"
  assert.throws(()=>quoteFromInvite({status:"pending",response},token,id),/válida/);
 });
 function rawSample(){return {project:"Hot Cruji Bravo",asset:"Stand",scope:"Elemento específico",area:"Panel",problem:"Daño visible"};}
+
+test("página de proveedor no exige identidad ni muestra presupuestos internos",()=>{
+ const base=fileURLToPath(new URL("../",import.meta.url));
+ const html=readFileSync(base+"reparacion-cotizar.html","utf8");
+ const js=readFileSync(base+"reparacion-cotizar.js","utf8");
+ assert.match(html,/name="provider"/);
+ assert.match(html,/name="amount"/);
+ assert.match(html,/noindex,nofollow/);
+ assert.match(js,/getDocFromServer\(record\(\)\)/);
+ assert.match(js,/supplierResponse/);
+ assert.doesNotMatch(js,/signInWithPopup|localStorage|sessionStorage/);
+});
+test("vista previa de foto está restringida a JPEG compartido",()=>{
+ const invite=invitePayload({id,project:"Stand",asset:"Panel",area:"Frente",problem:"Daño visible"},
+  "coordinator","Proveedor","fecha","expiry","data:image/jpeg;base64,/9j/2Q==");
+ assert.match(invite.snapshot.photoPreview,/^data:image\/jpeg;base64,/);
+ const invalid=invitePayload({id,project:"Stand",asset:"Panel",area:"Frente",problem:"Daño visible"},
+  "coordinator","Proveedor","fecha","expiry","data:text/html;base64,AAAA");
+ assert.equal(invalid.snapshot.photoPreview,"");
+});
