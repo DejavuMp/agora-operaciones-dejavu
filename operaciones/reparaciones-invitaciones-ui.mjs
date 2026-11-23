@@ -1,6 +1,7 @@
 import {collection,doc,onSnapshot,query,where,limit,writeBatch,updateDoc,serverTimestamp,Timestamp} from "https://www.gstatic.com/firebasejs/13.1.0/firebase-firestore.js";
 import {createInviteToken,invitePayload,supplierInviteUrl} from "./reparaciones-invitaciones-model.mjs";
-import {getStorage,ref as storageRef,getBlob} from "https://www.gstatic.com/firebasejs/13.1.0/firebase-storage.js";
+import {getDocFromServer,doc as photoDoc} from "https://www.gstatic.com/firebasejs/13.1.0/firebase-firestore.js";
+import {photoRefId} from "./reparaciones-fotos-spark.mjs";
 const esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const ST={pending:"Esperando propuesta",submitted:"Propuesta recibida",revoked:"Invitación cancelada"};
 const ID="agora_repair_invites";
@@ -71,7 +72,7 @@ export function mountInvitations(container,{db,request,user,notice,alreadyImport
    const days=Number(data.days);
    if(![3,7,14,21].includes(days))throw Error("Vigencia no válida");
    const bytes=crypto.getRandomValues(new Uint8Array(32)),token=createInviteToken(bytes);
-   const preview=data.includePhoto?await makePhotoPreview(request):"";
+   const preview=data.includePhoto?await makePhotoPreview(db,request):"";
    const exp=Timestamp.fromMillis(Date.now()+days*86400000),payload=invitePayload(request,user.uid,data.supplierHint,serverTimestamp(),exp,preview);
    const batch=writeBatch(db);
    batch.set(doc(db,ID,token),payload);
@@ -94,26 +95,14 @@ function copy(value,notice){
  else prompt("Copia este texto:",value);
 }
 
-async function makePhotoPreview(request){
- const path=request.photos?.[0]?.path;
- if(!path)throw Error("Adjunta primero una fotografía a la solicitud.");
- const fb=window.AGORA_FIREBASE,blob=await getBlob(storageRef(getStorage(fb.app),path));
- const url=URL.createObjectURL(blob);
- try{
-  const image=await new Promise((ok,fail)=>{const i=new Image;i.onload=()=>ok(i);i.onerror=()=>fail(new Error("No se pudo leer la foto"));i.src=url;});
-  const canvas=document.createElement("canvas");
-  const scale=Math.min(1,620/Math.max(image.naturalWidth,image.naturalHeight));
-  canvas.width=Math.max(1,Math.round(image.naturalWidth*scale));
-  canvas.height=Math.max(1,Math.round(image.naturalHeight*scale));
-  const context=canvas.getContext("2d");context.drawImage(image,0,0,canvas.width,canvas.height);
-  let data=canvas.toDataURL("image/jpeg",.5);
-  if(data.length>150000){
-   canvas.width=Math.max(1,Math.floor(canvas.width*.65));
-   canvas.height=Math.max(1,Math.floor(canvas.height*.65));
-   context.drawImage(image,0,0,canvas.width,canvas.height);
-   data=canvas.toDataURL("image/jpeg",.38);
-  }
-  if(data.length>150000)throw Error("La foto excede el tamaño máximo de vista previa");
-  return data;
- }finally{URL.revokeObjectURL(url)}
+async function makePhotoPreview(db,request){
+ const path=request.photos?.find(p=>photoRefId(p.path))?.path;
+ const id=photoRefId(path);
+ if(!id)throw Error("Adjunta primero una fotografía de la reparación a Firestore");
+ const snap=await getDocFromServer(photoDoc(db,"agora_repair_photos",id));
+ if(!snap.exists())throw Error("No se pudo recuperar la foto privada");
+ const data=snap.data().dataUrl;
+ if(typeof data!=="string"||!data.startsWith("data:image/jpeg;base64,")||data.length>90000)
+  throw Error("La vista previa JPEG es inválida");
+ return data;
 }
