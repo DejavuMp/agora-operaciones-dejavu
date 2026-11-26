@@ -1,5 +1,9 @@
 # Migración segura — 18 de noviembre de 2026
 
+## Desarrollo actual
+
+[Portal ÁGORA](https://dejavump.github.io/agora-compras-dejavu/portal-agora/) centraliza el acceso a las herramientas. Los cambios del circuito operativo y de sus integraciones se hacen en el [repositorio principal](https://github.com/DejavuMp/agora-compras-dejavu), con el cronograma oficial en su carpeta `operaciones/`. La copia de este repositorio conserva sus rutas publicadas para los accesos existentes.
+
 ## Origen
 `DejavuMp/agora-compras-dejavu`, commit `efb7784a230d438cc66d54523adcd689303bf02c`.
 
